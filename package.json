@@ -1,0 +1,30 @@
+{
+  "name": "remotepc-mcp",
+  "version": "1.0.0",
+  "description": "RemotePC MCP service: screenshot, mouse, and keyboard control tools exposed over MCP (stdio + Streamable HTTP)",
+  "main": "build/index.js",
+  "scripts": {
+    "test": "node --test build-test/tests/**/*.test.js",
+    "build": "tsc",
+    "start": "node build/server/local-server.js",
+    "pretest": "tsc -p tsconfig.test.json",
+    "start:remote": "node build/server/remote-server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@modelcontextprotocol/node": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.0.0",
+    "@types/node": "^26.3.0",
+    "typescript": "^7.0.2"
+  },
+  "bin": {
+    "remotepc-mcp": "build/index.js"
+  }
+}

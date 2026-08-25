@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "remotepc-mcp": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${workspaceFolder}/build/index.js"]
+    }
+  }
+}
