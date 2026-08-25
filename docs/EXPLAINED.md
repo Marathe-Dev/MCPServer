@@ -21,7 +21,7 @@ It currently exposes **6 tools**:
 | `key_press` | Presses key combos, e.g. `Ctrl+S`, `Alt+Tab` |
 | `get_window_list` | Lists visible windows with titles/positions |
 
-⚠️ **Important:** none of these tools touch real OS APIs yet. They return **fake/mock (placeholder) data**. The project is built so that real Windows/Linux/macOS implementations can be dropped in later without changing any tool code (see [Section 4](#4-what-is-actually-implemented-today)).
+✅ **Real OS control:** these tools drive the real mouse, keyboard, screen, and window list via [`@nut-tree-fork/nut-js`](https://www.npmjs.com/package/@nut-tree-fork/nut-js), a single cross-platform (Windows/macOS/Linux X11) native automation package. A deterministic `placeholder` backend (fake data, no OS access) remains available via `TOOL_BACKEND=placeholder` for offline/no-display environments (see [Section 4](#4-what-is-actually-implemented-today)).
 
 ---
 
@@ -48,8 +48,8 @@ graph TD
     B --> C[create-server.ts]
     C --> D[tools/*.tool.ts]
     D --> E[Service Interfaces I*Service]
-    E --> F[Placeholder implementations - fake data today]
-    F -.future.-> G[Real OS implementation - not built yet]
+    E --> F[nutjs implementations - real OS control, default]
+    F -.opt-in.-> H[placeholder implementations - fake data, TOOL_BACKEND=placeholder]
 ```
 
 - **[src/index.ts](../src/index.ts)** — the entrypoint. Reads the `MCP_TRANSPORT` env var to decide: run over `stdio` (local) or `http` (remote).
@@ -58,8 +58,9 @@ graph TD
 - **[src/server/remote-server.ts](../src/server/remote-server.ts)** — starts the server over **Streamable HTTP** on `http://127.0.0.1:3000/mcp`, for agents connecting over a network.
 - **[src/tools/*.tool.ts](../src/tools/)** — one file per tool. Each just validates input (via `zod`) and calls a service — it never talks to the OS directly.
 - **[src/services/interfaces/*.ts](../src/services/interfaces/)** — TypeScript interfaces (contracts), e.g. `IMouseService`, `IKeyboardService`. These define *what* a service must do, not *how*.
-- **[src/services/implementations/placeholder/*.ts](../src/services/implementations/placeholder/)** — the current implementations of those interfaces. They just fabricate deterministic fake responses (no real mouse/keyboard/screen access).
-- **[src/services/service-factory.ts](../src/services/service-factory.ts)** — picks which implementation to use based on the `TOOL_BACKEND` env var (only `"placeholder"` exists today).
+- **[src/services/implementations/nutjs/*.ts](../src/services/implementations/nutjs/)** — the default implementations. They call `@nut-tree-fork/nut-js` to really move the mouse, send keystrokes, capture the screen, and list windows.
+- **[src/services/implementations/placeholder/*.ts](../src/services/implementations/placeholder/)** — fabricate deterministic fake responses (no real mouse/keyboard/screen access); opt in via `TOOL_BACKEND=placeholder`.
+- **[src/services/service-factory.ts](../src/services/service-factory.ts)** — picks which implementation to use based on the `TOOL_BACKEND` env var (`"nutjs"` default, or `"placeholder"`).
 - **[src/models/*.ts](../src/models/)** — shared TypeScript types for requests/results.
 
 **Why the layers?** So that later, someone can write a real `WindowsMouseService` (that actually moves the mouse), register it in `service-factory.ts`, and nothing in `tools/` or `server/` needs to change.
@@ -68,17 +69,21 @@ graph TD
 
 ## 4. What is actually implemented today?
 
-✅ Done (Phase 1 + Phase 2 of the [implementation plan](IMPLEMENTATION_PLAN.md)):
+✅ Done (Phase 1 + Phase 2 + Phase 3 of the [implementation plan](IMPLEMENTATION_PLAN.md)):
 - All 6 MCP tools, registered on a shared server
 - Local stdio transport
 - Remote Streamable HTTP transport (loopback-only, with Host/Origin header validation)
-- Placeholder (mock) service implementations for screenshot/mouse/keyboard/window
+- Real, cross-platform service implementations for screenshot/mouse/keyboard/window via `@nut-tree-fork/nut-js` (default backend), plus a `placeholder` fallback backend
 - Automated tests that exercise every tool through a real in-process MCP client
 
 🔜 Not done (explicitly out of scope for now):
-- Real OS-level control (no actual screenshots/mouse/keyboard control happens)
 - Authentication (no API keys, no auth of any kind)
 - Docker packaging
+
+**Platform prerequisites for the real (`nutjs`) backend:**
+- Windows: none extra, prebuilt binaries are installed by `npm install`.
+- macOS: grant the terminal/IDE running the process both **Accessibility** and **Screen Recording** permissions.
+- Linux: requires `libxtst-dev` and an X11 session — Wayland is not supported.
 
 ---
 
@@ -191,4 +196,4 @@ For a **remote** connection instead, run `npm run start:remote` and configure th
 5. Today, `mouseService` is `PlaceholderMouseService` — it just returns a fake "success" response, it doesn't move any real mouse.
 6. The response goes back to the agent as a standard MCP tool result.
 
-To eventually make this "real", you would only need to write a new class implementing `IMouseService` (etc.) that actually calls OS APIs, and switch it on via `TOOL_BACKEND` in [service-factory.ts](../src/services/service-factory.ts) — no other file needs to change.
+This is now real: `mouseService` is `NutjsMouseService`, backed by `@nut-tree-fork/nut-js`, and it really moves the OS mouse cursor. Swapping backends (e.g. back to `placeholder`) only ever means changing `TOOL_BACKEND` in [service-factory.ts](../src/services/service-factory.ts) — no other file needs to change.

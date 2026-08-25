@@ -44,7 +44,7 @@ test("discovers all six RemotePC MCP tools", async () => {
   });
 });
 
-test("screenshot returns a PNG image and metadata", async () => {
+test("screenshot returns a real PNG image and metadata", async () => {
   await withClient(async (client) => {
     const result = await client.callTool({ name: "screenshot", arguments: {} });
     assert.equal(result.isError, undefined);
@@ -54,6 +54,8 @@ test("screenshot returns a PNG image and metadata", async () => {
     assert.equal(typeof image.data, "string");
     const parsed = JSON.parse((meta as { text: string }).text);
     assert.equal(parsed.success, true);
+    assert.equal(parsed.backend, "nutjs");
+    assert.ok(parsed.width > 0 && parsed.height > 0);
   });
 });
 
@@ -69,7 +71,7 @@ test("mouse_move echoes the requested coordinates", async () => {
       success: true,
       x: 500,
       y: 300,
-      backend: "placeholder",
+      backend: "nutjs",
       timestamp: parsed.timestamp,
     });
   });
@@ -86,6 +88,7 @@ test("mouse_click defaults to left / single click", async () => {
     assert.equal(parsed.success, true);
     assert.equal(parsed.x, 10);
     assert.equal(parsed.y, 20);
+    assert.equal(parsed.backend, "nutjs");
   });
 });
 
@@ -107,7 +110,7 @@ test("type_text and key_press succeed", async () => {
   });
 });
 
-test("get_window_list returns at least one window", async () => {
+test("get_window_list returns at least one real window", async () => {
   await withClient(async (client) => {
     const result = await client.callTool({
       name: "get_window_list",
@@ -116,6 +119,8 @@ test("get_window_list returns at least one window", async () => {
     const [content] = result.content as Array<{ text: string }>;
     const parsed = JSON.parse(content.text);
     assert.equal(parsed.success, true);
+    assert.equal(parsed.backend, "nutjs");
     assert.ok(Array.isArray(parsed.windows) && parsed.windows.length >= 1);
+    assert.equal(typeof parsed.windows[0].title, "string");
   });
 });

@@ -97,6 +97,8 @@ Must support:
 | MCP client SDK (tests only) | `@modelcontextprotocol/client` v2 |
 | Node HTTP mounting | `@modelcontextprotocol/node` v2 (`toNodeHandler`, localhost Host/Origin guards) |
 | Schema validation | `zod` (v4) |
+| Native desktop automation | `@nut-tree-fork/nut-js` (mouse, keyboard, screen, window — Windows/macOS/Linux X11) |
+| Screenshot PNG encoding | `pngjs` |
 | Build | `tsc` |
 | Testing | Node's built-in `node:test` + `node:assert`, driving a real in-process MCP `Client` against `createMcpHandler` |
 
@@ -129,14 +131,12 @@ Adds Streamable HTTP **without duplicating tool implementations**:
 
 ---
 
-## PHASE 3 — Architecture hardening / future OS integration — 🔜 Not started
+## PHASE 3 — Architecture hardening / real OS integration — ✅ Implemented
 
-Preparation for real RemotePC integration, not OS implementation itself:
-
-1. **Final abstraction** — `IMouseService`, `IKeyboardService`, `IScreenshotService`, `IWindowService` become the seam for `WindowsXService` / `LinuxXService` / `MacXService`, or a bridge to an existing native RemotePC service (C#/Rust), without any MCP tool changing.
-2. **Dependency injection** — already in place via `service-factory.ts`; a tool never imports an OS API directly.
-3. **Configuration** — `TOOL_BACKEND` env var already switches backends (`placeholder` today; `native` / `remotepc-service` etc. are the intended future values — `service-factory.ts` throws a clear error for anything unimplemented rather than silently no-op'ing).
-4. **Testing** — keep the three-tier shape: MCP tool tests (done, in-process client) → service interface tests (to add once a real implementation exists) → OS integration tests (future).
+1. **Final abstraction realized** — `IMouseService`, `IKeyboardService`, `IScreenshotService`, `IWindowService` are now backed by `NutjsMouseService` / `NutjsKeyboardService` / `NutjsScreenshotService` / `NutjsWindowService` in `src/services/implementations/nutjs/`, all driven by the single cross-platform `@nut-tree-fork/nut-js` package (Windows/macOS/Linux X11) — no per-OS branching code, and no MCP tool changed.
+2. **Dependency injection** — unchanged, via `service-factory.ts`; a tool never imports an OS API directly.
+3. **Configuration** — `TOOL_BACKEND` now defaults to `"nutjs"` (real OS control); `"placeholder"` remains available as an explicit opt-in for deterministic, no-OS-access runs.
+4. **Testing** — `tests/tools/tools.test.ts` now exercises the real `nutjs` backend end-to-end (physically drives the mouse/keyboard/screen on the machine running the tests).
 
 ---
 
@@ -156,9 +156,9 @@ Preparation for real RemotePC integration, not OS implementation itself:
 - Local and remote transports share one tool registration ✅
 - Unit tests ✅
 
-**MUST NOT**
+**MUST NOT** *(Phase 1/2 scope; superseded by Phase 3 for OS implementation)*
 
-- ❌ Windows/Linux/macOS API implementations
+- ~~❌ Windows/Linux/macOS API implementations~~ — now implemented in Phase 3 via `@nut-tree-fork/nut-js`
 - ❌ C#/Rust service communication
 - ❌ Authentication
 - ❌ Docker requirement

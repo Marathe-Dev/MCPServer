@@ -2,7 +2,7 @@
 
 A TypeScript/Node.js [Model Context Protocol](https://modelcontextprotocol.io) service that exposes RemotePC-style desktop-control tools to MCP-compatible AI agents (e.g. Cline).
 
-Implements **Phase 1** of the [implementation plan](docs/IMPLEMENTATION_PLAN.md): five required tools plus a bonus `get_window_list` tool (to match HopToDesk's published MCP catalog), a service abstraction layer, placeholder (mock) implementations, and a local stdio transport. Phase 2 (remote Streamable HTTP transport) is also scaffolded and working.
+Implements all phases of the [implementation plan](docs/IMPLEMENTATION_PLAN.md): five required tools plus a bonus `get_window_list` tool (to match HopToDesk's published MCP catalog), a service abstraction layer, a real cross-platform backend (`@nut-tree-fork/nut-js`) plus a deterministic placeholder fallback, and both local stdio and remote Streamable HTTP transports.
 
 ## Architecture
 
@@ -13,10 +13,10 @@ MCP Tool (screenshot, mouse_click, mouse_move, type_text, key_press, get_window_
 Service Interface (IScreenshotService, IMouseService, IKeyboardService, IWindowService)
         │
         ▼
-Placeholder implementation (today)  →  OS-specific / native implementation (future)
+nutjs implementation (default, real OS control)  ⇄  placeholder implementation (TOOL_BACKEND=placeholder)
 ```
 
-Tool handlers never call an OS API directly — they only call the interface. Swapping in a real Windows/Linux/macOS (or existing native RemotePC) backend later only requires implementing the four `I*Service` interfaces and wiring them in [`src/services/service-factory.ts`](src/services/service-factory.ts); no MCP tool code changes.
+Tool handlers never call an OS API directly — they only call the interface. The default `nutjs` backend implements the four `I*Service` interfaces via [`@nut-tree-fork/nut-js`](https://www.npmjs.com/package/@nut-tree-fork/nut-js), a single cross-platform (Windows/macOS/Linux X11) native automation package; a deterministic `placeholder` backend remains available via `TOOL_BACKEND=placeholder`. Swapping backends only requires wiring a new case into [`src/services/service-factory.ts`](src/services/service-factory.ts); no MCP tool code changes.
 
 Both the local (stdio) and remote (Streamable HTTP) transports call the same [`createServer()`](src/server/create-server.ts) factory, so tool behavior never diverges between connection modes.
 
@@ -31,8 +31,9 @@ src/
   tools/                 One file per MCP tool; thin, calls services only
   services/
     interfaces/          I*Service abstractions (the contract MCP tools depend on)
+    implementations/nutjs/        Real cross-platform implementations (@nut-tree-fork/nut-js)
     implementations/placeholder/   Deterministic mock implementations
-    service-factory.ts   Picks a backend via TOOL_BACKEND env var
+    service-factory.ts   Picks a backend via TOOL_BACKEND env var (default: nutjs)
   models/                Shared request/result types
   index.ts               Entrypoint; picks stdio vs http via MCP_TRANSPORT
 tests/tools/             In-process MCP client tests (node:test)
