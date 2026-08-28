@@ -14,6 +14,27 @@ export function createServer() {
         version: "0.1.0",
     });
     const services = createServices();
-    registerAllTools(server, services);
+    registerAllTools(withToolCallLogging(server), services);
+    return server;
+}
+/**
+ * Wraps `registerTool` so every call logs its tool name, arguments, and
+ * outcome to stderr — MCP clients (e.g. Claude Desktop) capture a server's
+ * stderr into their own per-server log file, so this shows up there too.
+ */
+function withToolCallLogging(server) {
+    const registerTool = server.registerTool.bind(server);
+    server.registerTool = ((name, config, handler) => registerTool(name, config, (async (...handlerArgs) => {
+        console.error(`[remotepc-mcp] tool_call name=${name} args=${JSON.stringify(handlerArgs[0] ?? {})}`);
+        try {
+            const result = await handler(...handlerArgs);
+            console.error(`[remotepc-mcp] tool_result name=${name} success=true`);
+            return result;
+        }
+        catch (error) {
+            console.error(`[remotepc-mcp] tool_result name=${name} success=false error=${String(error)}`);
+            throw error;
+        }
+    })));
     return server;
 }
