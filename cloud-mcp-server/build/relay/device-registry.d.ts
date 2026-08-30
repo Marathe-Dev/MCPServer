@@ -11,7 +11,6 @@ export declare class DeviceRegistry {
     register(deviceId: string, socket: WebSocket): void;
     unregister(deviceId: string, socket: WebSocket): void;
     isConnected(deviceId: string): boolean;
-    /** IDs of every currently connected Local Tool Service, for discovery and error messages. */
     listConnectedDeviceIds(): string[];
     /** Resolves/rejects the pending request matching a tool_result's requestId. */
     handleResult(message: RelayResponseMessage): void;

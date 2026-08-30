@@ -23,9 +23,8 @@ export class DeviceRegistry {
     isConnected(deviceId) {
         return this.devices.has(deviceId);
     }
-    /** IDs of every currently connected Local Tool Service, for discovery and error messages. */
     listConnectedDeviceIds() {
-        return [...this.devices.keys()];
+        return [...this.devices.keys()].sort((left, right) => left.localeCompare(right));
     }
     /** Resolves/rejects the pending request matching a tool_result's requestId. */
     handleResult(message) {
@@ -45,10 +44,8 @@ export class DeviceRegistry {
     async sendRequest(deviceId, tool, args, timeoutMs = DEFAULT_TIMEOUT_MS) {
         const socket = this.devices.get(deviceId);
         if (!socket) {
-            const connected = this.listConnectedDeviceIds();
-            const hint = connected.length > 0 ? `Connected devices: ${connected.join(", ")}.` : "No devices are currently connected.";
             console.error(`[cloud-mcp-server] sendRequest failed: device "${deviceId}" is not connected`);
-            throw new Error(`Device "${deviceId}" is not connected. ${hint}`);
+            throw new Error(`Device "${deviceId}" is not connected`);
         }
         const requestId = randomUUID();
         const message = {
