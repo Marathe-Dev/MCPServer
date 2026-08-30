@@ -1,0 +1,28 @@
+{
+  "name": "cloud-mcp-server",
+  "version": "0.1.0",
+  "description": "Cloud-hosted MCP server: exposes MCP over Streamable HTTP to agents (one endpoint per device) and relays tool calls to paired Local Tool Service instances over WebSocket",
+  "main": "build/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node build/index.js",
+    "pretest": "tsc -p tsconfig.test.json",
+    "test": "node --test build-test/tests/**/*.test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/node": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "ws": "^8.18.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.0.0",
+    "@types/node": "^26.3.0",
+    "@types/ws": "^8.5.12",
+    "typescript": "^7.0.2"
+  }
+}

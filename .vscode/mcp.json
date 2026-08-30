@@ -3,7 +3,7 @@
     "remotepc-mcp": {
       "type": "stdio",
       "command": "node",
-      "args": ["${workspaceFolder}/build/index.js"]
+      "args": ["${workspaceFolder}/local-mcp-server/build/index.js"]
     }
   }
 }

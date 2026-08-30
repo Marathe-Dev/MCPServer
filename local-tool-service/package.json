@@ -1,0 +1,29 @@
+{
+  "name": "local-tool-service",
+  "version": "0.1.0",
+  "description": "Runs on the controlled desktop: connects out to a Cloud MCP Server over WebSocket and executes real mouse/keyboard/screen/window tool calls via nut-js",
+  "main": "build/index.js",
+  "type": "module",
+  "bin": {
+    "local-tool-service": "build/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node build/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@nut-tree-fork/nut-js": "^4.2.6",
+    "pngjs": "^7.0.0",
+    "systray2": "^2.1.4",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.3.0",
+    "@types/pngjs": "^6.0.5",
+    "@types/ws": "^8.5.12",
+    "typescript": "^7.0.2"
+  }
+}

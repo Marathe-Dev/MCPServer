@@ -140,16 +140,16 @@ The repo already includes [.vscode/mcp.json](../.vscode/mcp.json), so VS Code's 
     "remotepc-mcp": {
       "type": "stdio",
       "command": "node",
-      "args": ["${workspaceFolder}/build/index.js"]
+      "args": ["${workspaceFolder}/local-mcp-server/build/index.js"]
     }
   }
 }
 ```
 
 To use it:
-1. Run `npm run build` at least once so `build/index.js` exists.
+1. Run `cd local-mcp-server && npm run build` at least once so `local-mcp-server/build/index.js` exists.
 2. Open this workspace in VS Code — the MCP server config is picked up automatically from `.vscode/mcp.json`.
-3. Start/enable the `remotepc-mcp` server from the MCP UI (or your agent's tool panel) — the agent will launch `node build/index.js` for you and talk to it over stdio.
+3. Start/enable the `remotepc-mcp` server from the MCP UI (or your agent's tool panel) — the agent will launch `node local-mcp-server/build/index.js` for you and talk to it over stdio.
 
 For other MCP hosts (e.g. Cline directly), point them at the same command:
 
@@ -158,7 +158,7 @@ For other MCP hosts (e.g. Cline directly), point them at the same command:
   "mcpServers": {
     "remotepc-mcp": {
       "command": "node",
-      "args": ["D:\\MCP Server\\build\\index.js"]
+      "args": ["D:\\MCP Server\\local-mcp-server\\build\\index.js"]
     }
   }
 }
