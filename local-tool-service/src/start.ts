@@ -8,7 +8,7 @@ import { NutjsWindowService } from "./services/implementations/nutjs/nutjs-windo
 
 /** Wires config + real nut-js services + the relay client together and connects. */
 export function start(): RelayClient {
-  const { deviceId, cloudUrl } = loadConfig();
+  const { deviceId, cloudUrl, deviceName, platform } = loadConfig();
 
   const services = {
     mouseService: new NutjsMouseService(),
@@ -17,7 +17,7 @@ export function start(): RelayClient {
     windowService: new NutjsWindowService(),
   };
 
-  const client = new RelayClient(cloudUrl, deviceId);
+  const client = new RelayClient(cloudUrl, deviceId, deviceName, platform);
   client.onToolCallMessage(createDispatcher(services, client));
   client.connect();
 

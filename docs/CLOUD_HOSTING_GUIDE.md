@@ -50,6 +50,8 @@ Watch the cloud server's terminal for `device registered: local-test-device` —
 confirms the relay is connected end to end. Automated, OS-independent tests also exist:
 `cd cloud-mcp-server; npm test`.
 
+Test using MCP Inspector : `npx @modelcontextprotocol/inspector`
+
 ---
 
 ## 2. Host cloud-mcp-server on Render.com

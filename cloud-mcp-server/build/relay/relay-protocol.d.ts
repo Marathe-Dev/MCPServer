@@ -7,6 +7,9 @@ export type RelayToolName = "mouse.move" | "mouse.click" | "keyboard.typeText" |
 export interface RegisterMessage {
     type: "register";
     deviceId: string;
+    /** Friendly hostname and OS platform, sent so the cloud dashboard can show device metadata. */
+    deviceName?: string;
+    platform?: string;
 }
 export interface PingMessage {
     type: "ping";

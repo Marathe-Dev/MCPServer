@@ -3,29 +3,62 @@ const DEFAULT_TIMEOUT_MS = 15000;
 /**
  * Tracks connected Local Tool Service WebSocket connections keyed by
  * deviceId, and correlates outgoing tool_call requests with the matching
- * tool_result response.
+ * tool_result response. Devices are kept (marked "offline") after
+ * disconnect rather than deleted, so the dashboard can show history for
+ * the lifetime of this process.
  */
 export class DeviceRegistry {
     devices = new Map();
     pending = new Map();
-    register(deviceId, socket) {
+    register(deviceId, socket, meta) {
         const existing = this.devices.get(deviceId);
-        if (existing && existing !== socket) {
-            existing.close(1000, "replaced by a new connection");
+        if (existing?.socket && existing.socket !== socket) {
+            existing.socket.close(1000, "replaced by a new connection");
         }
-        this.devices.set(deviceId, socket);
+        const now = new Date().toISOString();
+        this.devices.set(deviceId, {
+            socket,
+            info: {
+                deviceId,
+                deviceName: meta?.deviceName ?? existing?.info.deviceName ?? deviceId,
+                platform: meta?.platform ?? existing?.info.platform ?? "unknown",
+                status: "online",
+                connectedAt: existing?.info.connectedAt ?? now,
+                lastActive: now,
+            },
+        });
     }
     unregister(deviceId, socket) {
-        if (this.devices.get(deviceId) === socket) {
-            this.devices.delete(deviceId);
+        const entry = this.devices.get(deviceId);
+        if (entry?.socket === socket) {
+            entry.socket = undefined;
+            entry.info = { ...entry.info, status: "offline", lastActive: new Date().toISOString() };
+        }
+    }
+    /** Updates lastActive without changing connection state; call on pong/tool_result traffic. */
+    touch(deviceId) {
+        const entry = this.devices.get(deviceId);
+        if (entry) {
+            entry.info = { ...entry.info, lastActive: new Date().toISOString() };
         }
     }
     isConnected(deviceId) {
-        return this.devices.has(deviceId);
+        return this.devices.get(deviceId)?.socket !== undefined;
     }
-    /** IDs of every currently connected Local Tool Service, for discovery and error messages. */
     listConnectedDeviceIds() {
-        return [...this.devices.keys()];
+        return [...this.devices.entries()]
+            .filter(([, entry]) => entry.socket !== undefined)
+            .map(([deviceId]) => deviceId)
+            .sort((left, right) => left.localeCompare(right));
+    }
+    /** Full metadata for every device seen this process lifetime (including offline), for the dashboard. */
+    listDevices() {
+        return [...this.devices.values()]
+            .map((entry) => entry.info)
+            .sort((left, right) => left.deviceName.localeCompare(right.deviceName));
+    }
+    getDevice(deviceId) {
+        return this.devices.get(deviceId)?.info;
     }
     /** Resolves/rejects the pending request matching a tool_result's requestId. */
     handleResult(message) {
@@ -43,12 +76,10 @@ export class DeviceRegistry {
     }
     /** Sends a tool_call to a device and awaits its tool_result (or a timeout / offline error). */
     async sendRequest(deviceId, tool, args, timeoutMs = DEFAULT_TIMEOUT_MS) {
-        const socket = this.devices.get(deviceId);
+        const socket = this.devices.get(deviceId)?.socket;
         if (!socket) {
-            const connected = this.listConnectedDeviceIds();
-            const hint = connected.length > 0 ? `Connected devices: ${connected.join(", ")}.` : "No devices are currently connected.";
             console.error(`[cloud-mcp-server] sendRequest failed: device "${deviceId}" is not connected`);
-            throw new Error(`Device "${deviceId}" is not connected. ${hint}`);
+            throw new Error(`Device "${deviceId}" is not connected`);
         }
         const requestId = randomUUID();
         const message = {

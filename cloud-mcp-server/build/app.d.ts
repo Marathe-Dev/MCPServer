@@ -8,8 +8,9 @@ export interface CloudApp {
     mcpHandler: McpHttpHandler;
 }
 /**
- * Builds the full app (universal MCP HTTP routing + `/device-link` WS
- * upgrade) without starting to listen — kept separate from `index.ts` so
- * tests can bind an ephemeral port.
+ * Builds the full app (universal MCP HTTP routing + REST dashboard API +
+ * static dashboard UI + `/device-link` WS upgrade) without starting to
+ * listen — kept separate from `index.ts` so tests can bind an ephemeral
+ * port.
  */
 export declare function createApp(): CloudApp;

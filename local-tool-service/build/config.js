@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, hostname, platform } from "node:os";
 import { join } from "node:path";
 const CONFIG_DIR = join(homedir(), ".local-tool-service");
 const CONFIG_PATH = join(CONFIG_DIR, "config.json");
@@ -12,7 +12,8 @@ const CONFIG_PATH = join(CONFIG_DIR, "config.json");
 export function loadConfig() {
     const cloudUrl = process.env.CLOUD_URL ?? "ws://127.0.0.1:4000";
     const deviceId = process.env.DEVICE_ID ?? loadOrCreatePersistedDeviceId();
-    return { deviceId, cloudUrl };
+    const deviceName = process.env.DEVICE_NAME ?? hostname();
+    return { deviceId, cloudUrl, deviceName, platform: platform() };
 }
 function loadOrCreatePersistedDeviceId() {
     if (existsSync(CONFIG_PATH)) {

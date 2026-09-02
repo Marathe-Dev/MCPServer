@@ -22,6 +22,8 @@ export class RelayClient {
   constructor(
     private readonly cloudUrl: string,
     private readonly deviceId: string,
+    private readonly deviceName?: string,
+    private readonly platform?: string,
   ) {}
 
   onToolCallMessage(handler: ToolCallHandler): void {
@@ -57,7 +59,12 @@ export class RelayClient {
       this.connected = true;
       this.reconnectDelayMs = RECONNECT_MIN_MS;
       console.error(`[local-tool-service] connected to ${url}`);
-      this.send({ type: "register", deviceId: this.deviceId });
+      this.send({
+        type: "register",
+        deviceId: this.deviceId,
+        deviceName: this.deviceName,
+        platform: this.platform,
+      });
     });
 
     socket.on("message", (raw: Buffer) => {

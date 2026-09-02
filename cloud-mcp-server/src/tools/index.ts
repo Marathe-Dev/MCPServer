@@ -7,6 +7,7 @@ import { registerTypeTextTool } from "./type-text.tool.js";
 import { registerKeyPressTool } from "./key-press.tool.js";
 import { registerGetWindowListTool } from "./get-window-list.tool.js";
 import { registerListDevicesTool } from "./list-devices.tool.js";
+import { registerShowDashboardTool } from "./show-dashboard.tool.js";
 
 /** Registers every RemotePC MCP tool on the given server instance. */
 export function registerAllTools(
@@ -20,4 +21,5 @@ export function registerAllTools(
   registerTypeTextTool(server, deviceRegistry);
   registerKeyPressTool(server, deviceRegistry);
   registerGetWindowListTool(server, deviceRegistry);
+  registerShowDashboardTool(server, deviceRegistry);
 }

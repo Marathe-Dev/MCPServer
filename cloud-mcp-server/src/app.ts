@@ -1,14 +1,21 @@
 import { createServer as createHttpServer, type Server } from "node:http";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   createMcpHandler,
   type McpHttpHandler,
 } from "@modelcontextprotocol/server";
 import { toNodeHandler } from "@modelcontextprotocol/node";
+import express, { json } from "express";
 import { createServer } from "./server/create-server.js";
 import { DeviceRegistry } from "./relay/device-registry.js";
 import { createDeviceLinkServer } from "./relay/device-link-server.js";
+import { createDashboardRouter } from "./api/dashboard-router.js";
 
 export const MCP_PATH = /^\/mcp\/?$/;
+
+/** `dashboard/` lives next to `src`/`build`, one level above this compiled file. */
+const DASHBOARD_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "dashboard");
 
 export interface CloudApp {
   httpServer: Server;
@@ -17,9 +24,10 @@ export interface CloudApp {
 }
 
 /**
- * Builds the full app (universal MCP HTTP routing + `/device-link` WS
- * upgrade) without starting to listen — kept separate from `index.ts` so
- * tests can bind an ephemeral port.
+ * Builds the full app (universal MCP HTTP routing + REST dashboard API +
+ * static dashboard UI + `/device-link` WS upgrade) without starting to
+ * listen — kept separate from `index.ts` so tests can bind an ephemeral
+ * port.
  */
 export function createApp(): CloudApp {
   const deviceRegistry = new DeviceRegistry();
@@ -28,22 +36,23 @@ export function createApp(): CloudApp {
   const mcpHandler = createMcpHandler(() => createServer(deviceRegistry));
   const mcpNodeHandler = toNodeHandler(mcpHandler);
 
-  const httpServer = createHttpServer((req, res) => {
-    const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
-    console.error(`[cloud-mcp-server] http ${req.method} ${url.pathname}`);
+  const expressApp = express();
+  expressApp.use((req, _res, next) => {
+    console.error(`[cloud-mcp-server] http ${req.method} ${req.path}`);
+    next();
+  });
 
-    if (url.pathname === "/") {
-      res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ status: "ok", service: "cloud-mcp-server" }));
-      return;
-    }
+  expressApp.get("/", (_req, res) => {
+    res.json({ status: "ok", service: "cloud-mcp-server" });
+  });
 
-    if (!MCP_PATH.test(url.pathname)) {
-      console.error(`[cloud-mcp-server] 404 no MCP route match for ${url.pathname}`);
-      res.writeHead(404, { "content-type": "text/plain" });
-      res.end("Not found. Connect an MCP client to /mcp.");
-      return;
-    }
+  // `json()` is scoped to /api only so it never consumes the MCP endpoint's
+  // own request stream (Streamable HTTP reads the raw body itself).
+  expressApp.use("/api", json(), createDashboardRouter(deviceRegistry));
+
+  expressApp.use("/dashboard", express.static(DASHBOARD_DIR));
+
+  expressApp.all(MCP_PATH, (req, res) => {
     Promise.resolve(mcpNodeHandler(req, res)).catch((error: unknown) => {
       console.error(`[cloud-mcp-server] mcp handler error: ${String(error)}`);
       if (!res.headersSent) {
@@ -52,6 +61,12 @@ export function createApp(): CloudApp {
       }
     });
   });
+
+  expressApp.use((_req, res) => {
+    res.status(404).type("text/plain").send("Not found. Connect an MCP client to /mcp.");
+  });
+
+  const httpServer = createHttpServer(expressApp);
 
   httpServer.on("upgrade", (req, socket, head) => {
     console.error(`[cloud-mcp-server] ws upgrade request: ${req.url}`);

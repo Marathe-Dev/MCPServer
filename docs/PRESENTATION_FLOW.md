@@ -1,4 +1,4 @@
-# MCP Flow for Manager Presentation
+# MCP Flow for Presentation
 
 This document gives a short, presentation-friendly view of the current local MCP setup and the planned cloud MCP setup.
 
@@ -8,7 +8,7 @@ This is the same basic pattern used by HopToDesk-style desktop control: the agen
 
 ```mermaid
 flowchart LR
-    A[AI Agent / Desktop Agent] --> R[Relay endpoint\nroute request to device]
+    A[AI Agent / Desktop Agent] -- "Streamable HTTP" --> R[Relay endpoint\nroute request to device]
     R --> B[Target device MCP server\nlocal-mcp-server on the selected device]
     B --> C[Local OS Automation\nmouse / keyboard / screenshot / windows]
     C --> D[User's desktop]
@@ -32,12 +32,12 @@ sequenceDiagram
     participant Desktop as User's device
 
     User->>Agent: Ask for an action or information
-    Agent->>Relay: Call the relay URL
-    Relay->>Local: Forward the request to the selected device
+    Agent->>Relay: Call the relay URL (Streamable HTTP)
+    Relay->>Local: Forward the request to the selected device (WebSocket)
     Local->>Desktop: Perform the local OS action
     Desktop-->>Local: Return result
-    Local-->>Relay: Send result back
-    Relay-->>Agent: Return response
+    Local-->>Relay: Send result back (WebSocket)
+    Relay-->>Agent: Return response (Streamable HTTP)
     Agent-->>User: Show answer
 ```
 
@@ -47,12 +47,12 @@ The cloud MCP server becomes the central entry point for agents. It will route d
 
 ```mermaid
 flowchart LR
-    Agent[Web Agent / Desktop Agent] --> CloudMCP[Cloud MCP Server\nSingle public /mcp endpoint]
+    Agent[Web Agent / Desktop Agent] -- "Streamable HTTP" --> CloudMCP[Cloud MCP Server\nSingle public /mcp endpoint]
 
     CloudMCP --> DeviceList[List devices\nselect target device]
     CloudMCP --> Relay[Route tool call by deviceName]
 
-    Relay --> LocalSvc[local-tool-service\nRuns on the target desktop]
+    Relay -- "WebSocket" --> LocalSvc[local-tool-service\nRuns on the target desktop]
     LocalSvc --> LocalOS[Local OS automation\nmouse / keyboard / screenshot / windows]
 
     CloudMCP --> WebTools[Future web tools\naccount, product DB, services]
@@ -77,17 +77,17 @@ sequenceDiagram
     participant Desktop as User's device
 
     User->>Agent: Ask for an action or information
-    Agent->>Cloud: Call MCP tool
+    Agent->>Cloud: Call MCP tool (Streamable HTTP)
     Cloud->>Cloud: Decide whether the request is for web data or a device
-    Cloud->>Local: Send desktop tool request when device access is needed
+    Cloud->>Local: Send desktop tool request when device access is needed (WebSocket)
     Local->>Desktop: Perform real OS action
     Desktop-->>Local: Return result
-    Local-->>Cloud: Send result back
-    Cloud-->>Agent: Return unified answer
+    Local-->>Cloud: Send result back (WebSocket)
+    Cloud-->>Agent: Return unified answer (Streamable HTTP)
     Agent-->>User: Show answer in one place
 ```
 
-## 4. Simple talking points
+## 4. Current & future optimisation plan
 
 - Today: we already support local desktop access through a local MCP server.
 - Next: the cloud MCP server will become the central control plane for many devices.

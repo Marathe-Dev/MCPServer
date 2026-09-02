@@ -90,7 +90,7 @@ async function withRegisteredDevice(run) {
         await tearDownHarness(harness);
     }
 }
-test("discovers all seven MCP tools through the relay", async () => {
+test("discovers all eight MCP tools through the relay", async () => {
     await withRegisteredDevice(async (client) => {
         const { tools } = await client.listTools();
         const names = tools.map((t) => t.name).sort();
@@ -101,6 +101,7 @@ test("discovers all seven MCP tools through the relay", async () => {
             "mouse_click",
             "mouse_move",
             "screenshot",
+            "show_dashboard",
             "type_text",
         ]);
     });

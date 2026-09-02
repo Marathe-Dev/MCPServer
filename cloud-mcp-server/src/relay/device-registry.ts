@@ -12,37 +12,95 @@ interface PendingRequest {
   timeoutHandle: NodeJS.Timeout;
 }
 
+export type DeviceStatus = "online" | "offline";
+
+/** Dashboard-facing device metadata (deviceName/platform default to deviceId/"unknown" until a register message supplies them). */
+export interface DeviceInfo {
+  deviceId: string;
+  deviceName: string;
+  platform: string;
+  status: DeviceStatus;
+  connectedAt: string;
+  lastActive: string;
+}
+
+interface DeviceEntry {
+  socket: WebSocket | undefined;
+  info: DeviceInfo;
+}
+
 const DEFAULT_TIMEOUT_MS = 15000;
 
 /**
  * Tracks connected Local Tool Service WebSocket connections keyed by
  * deviceId, and correlates outgoing tool_call requests with the matching
- * tool_result response.
+ * tool_result response. Devices are kept (marked "offline") after
+ * disconnect rather than deleted, so the dashboard can show history for
+ * the lifetime of this process.
  */
 export class DeviceRegistry {
-  private readonly devices = new Map<string, WebSocket>();
+  private readonly devices = new Map<string, DeviceEntry>();
   private readonly pending = new Map<string, PendingRequest>();
 
-  register(deviceId: string, socket: WebSocket): void {
+  register(
+    deviceId: string,
+    socket: WebSocket,
+    meta?: { deviceName?: string; platform?: string },
+  ): void {
     const existing = this.devices.get(deviceId);
-    if (existing && existing !== socket) {
-      existing.close(1000, "replaced by a new connection");
+    if (existing?.socket && existing.socket !== socket) {
+      existing.socket.close(1000, "replaced by a new connection");
     }
-    this.devices.set(deviceId, socket);
+    const now = new Date().toISOString();
+    this.devices.set(deviceId, {
+      socket,
+      info: {
+        deviceId,
+        deviceName: meta?.deviceName ?? existing?.info.deviceName ?? deviceId,
+        platform: meta?.platform ?? existing?.info.platform ?? "unknown",
+        status: "online",
+        connectedAt: existing?.info.connectedAt ?? now,
+        lastActive: now,
+      },
+    });
   }
 
   unregister(deviceId: string, socket: WebSocket): void {
-    if (this.devices.get(deviceId) === socket) {
-      this.devices.delete(deviceId);
+    const entry = this.devices.get(deviceId);
+    if (entry?.socket === socket) {
+      entry.socket = undefined;
+      entry.info = { ...entry.info, status: "offline", lastActive: new Date().toISOString() };
+    }
+  }
+
+  /** Updates lastActive without changing connection state; call on pong/tool_result traffic. */
+  touch(deviceId: string): void {
+    const entry = this.devices.get(deviceId);
+    if (entry) {
+      entry.info = { ...entry.info, lastActive: new Date().toISOString() };
     }
   }
 
   isConnected(deviceId: string): boolean {
-    return this.devices.has(deviceId);
+    return this.devices.get(deviceId)?.socket !== undefined;
   }
 
   listConnectedDeviceIds(): string[] {
-    return [...this.devices.keys()].sort((left, right) => left.localeCompare(right));
+    return [...this.devices.entries()]
+      .filter(([, entry]) => entry.socket !== undefined)
+      .map(([deviceId]) => deviceId)
+      .sort((left, right) => left.localeCompare(right));
+  }
+
+  /** Full metadata for every device seen this process lifetime (including offline), for the dashboard. */
+  listDevices(): DeviceInfo[] {
+    return [...this.devices.values()]
+      .map((entry) => entry.info)
+      .sort((left, right) => left.deviceName.localeCompare(right.deviceName));
+  }
+
+  getDevice(deviceId: string): DeviceInfo | undefined {
+    return this.devices.get(deviceId)?.info;
   }
 
   /** Resolves/rejects the pending request matching a tool_result's requestId. */
@@ -65,7 +123,7 @@ export class DeviceRegistry {
     args: unknown,
     timeoutMs = DEFAULT_TIMEOUT_MS,
   ): Promise<T> {
-    const socket = this.devices.get(deviceId);
+    const socket = this.devices.get(deviceId)?.socket;
     if (!socket) {
       console.error(`[cloud-mcp-server] sendRequest failed: device "${deviceId}" is not connected`);
       throw new Error(`Device "${deviceId}" is not connected`);

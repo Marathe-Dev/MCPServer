@@ -10,14 +10,18 @@ const RECONNECT_MAX_MS = 30000;
 export class RelayClient {
     cloudUrl;
     deviceId;
+    deviceName;
+    platform;
     socket;
     reconnectDelayMs = RECONNECT_MIN_MS;
     stopped = false;
     connected = false;
     onToolCall = () => { };
-    constructor(cloudUrl, deviceId) {
+    constructor(cloudUrl, deviceId, deviceName, platform) {
         this.cloudUrl = cloudUrl;
         this.deviceId = deviceId;
+        this.deviceName = deviceName;
+        this.platform = platform;
     }
     onToolCallMessage(handler) {
         this.onToolCall = handler;
@@ -46,7 +50,12 @@ export class RelayClient {
             this.connected = true;
             this.reconnectDelayMs = RECONNECT_MIN_MS;
             console.error(`[local-tool-service] connected to ${url}`);
-            this.send({ type: "register", deviceId: this.deviceId });
+            this.send({
+                type: "register",
+                deviceId: this.deviceId,
+                deviceName: this.deviceName,
+                platform: this.platform,
+            });
         });
         socket.on("message", (raw) => {
             let message;

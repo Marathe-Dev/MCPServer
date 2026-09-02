@@ -7,14 +7,14 @@ import { NutjsScreenshotService } from "./services/implementations/nutjs/nutjs-s
 import { NutjsWindowService } from "./services/implementations/nutjs/nutjs-window.service.js";
 /** Wires config + real nut-js services + the relay client together and connects. */
 export function start() {
-    const { deviceId, cloudUrl } = loadConfig();
+    const { deviceId, cloudUrl, deviceName, platform } = loadConfig();
     const services = {
         mouseService: new NutjsMouseService(),
         keyboardService: new NutjsKeyboardService(),
         screenshotService: new NutjsScreenshotService(),
         windowService: new NutjsWindowService(),
     };
-    const client = new RelayClient(cloudUrl, deviceId);
+    const client = new RelayClient(cloudUrl, deviceId, deviceName, platform);
     client.onToolCallMessage(createDispatcher(services, client));
     client.connect();
     console.error(`[local-tool-service] device id: ${deviceId}`);

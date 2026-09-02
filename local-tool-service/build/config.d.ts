@@ -1,6 +1,8 @@
 export interface LocalToolServiceConfig {
     deviceId: string;
     cloudUrl: string;
+    deviceName: string;
+    platform: string;
 }
 /**
  * Loads DEVICE_ID/CLOUD_URL from the environment, falling back to a random

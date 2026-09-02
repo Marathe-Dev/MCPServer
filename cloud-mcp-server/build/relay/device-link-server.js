@@ -18,13 +18,20 @@ export function createDeviceLinkServer(registry) {
             switch (message.type) {
                 case "register":
                     deviceId = message.deviceId;
-                    registry.register(deviceId, socket);
+                    registry.register(deviceId, socket, {
+                        deviceName: message.deviceName,
+                        platform: message.platform,
+                    });
                     console.error(`[cloud-mcp-server] device registered: ${deviceId}`);
                     break;
                 case "tool_result":
                     registry.handleResult(message);
+                    if (deviceId)
+                        registry.touch(deviceId);
                     break;
                 case "pong":
+                    if (deviceId)
+                        registry.touch(deviceId);
                     break;
                 default:
                     console.error(`[cloud-mcp-server] unexpected message type from device: ${message.type}`);

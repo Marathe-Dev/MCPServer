@@ -23,7 +23,12 @@ npm run build
 | --- | --- | --- |
 | `CLOUD_URL` | `ws://127.0.0.1:4000` | Base URL of the cloud-mcp-server (`/device-link` is appended automatically) |
 | `DEVICE_ID` | random UUID, persisted to `~/.local-tool-service/config.json` on first run | Share this with the agent(s) that should control this desktop |
+| `DEVICE_NAME` | this machine's hostname | Friendly name shown on the cloud-mcp-server dashboard |
 | `NO_TRAY` | unset | Set to `1` to skip the system tray icon (headless) |
+
+The `register` message sent on connect also includes `platform` (`os.platform()`,
+auto-detected, not configurable) so the cloud-mcp-server dashboard can show device
+name/OS without any extra setup.
 
 ## Run in the foreground (for testing)
 

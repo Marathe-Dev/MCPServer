@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RemotePC Control Dashboard</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="topbar__title">
+      <i class="ti ti-devices"></i>
+      <span>RemotePC Control Dashboard</span>
+    </div>
+    <div class="topbar__meta">
+      <span id="deviceCount" class="pill">0 devices</span>
+      <span id="lastRefresh" class="muted">never refreshed</span>
+    </div>
+  </header>
+
+  <main class="content">
+
+    <section class="panel">
+      <div class="panel__header">
+        <h2><i class="ti ti-server-2"></i> Connected Devices</h2>
+      </div>
+      <div id="deviceGrid" class="device-grid">
+        <p class="empty-state">No devices yet — waiting for the first refresh…</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel__header">
+        <h2><i class="ti ti-bolt"></i> Quick Actions</h2>
+      </div>
+      <div class="quick-actions">
+        <button class="quick-action" data-action="list-devices">
+          <i class="ti ti-refresh"></i>
+          <span>List Devices</span>
+        </button>
+        <button class="quick-action" data-action="screenshot-all">
+          <i class="ti ti-camera"></i>
+          <span>Screenshot All</span>
+        </button>
+        <button class="quick-action" data-action="type-text">
+          <i class="ti ti-keyboard"></i>
+          <span>Type Text</span>
+        </button>
+        <button class="quick-action" data-action="click">
+          <i class="ti ti-click"></i>
+          <span>Click</span>
+        </button>
+      </div>
+      <p class="muted small">Active device: <strong id="activeDeviceLabel">none selected</strong> — click "Connect" on a device card to target it.</p>
+    </section>
+
+    <section class="panel">
+      <div class="panel__header">
+        <h2><i class="ti ti-activity"></i> System Monitor</h2>
+      </div>
+      <div class="table-wrap">
+        <table class="monitor-table">
+          <thead>
+            <tr>
+              <th>Device Name</th>
+              <th>Status</th>
+              <th>Last Active</th>
+            </tr>
+          </thead>
+          <tbody id="monitorBody">
+            <tr><td colspan="3" class="empty-state">No data yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Type Text modal -->
+<div id="typeTextModal" class="modal-overlay hidden">
+  <div class="modal">
+    <h3><i class="ti ti-keyboard"></i> Type Text</h3>
+    <label>Target device</label>
+    <select id="typeTextDevice"></select>
+    <label>Text to type</label>
+    <textarea id="typeTextInput" rows="4" placeholder="Text to send to the remote device…"></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-close-modal>Cancel</button>
+      <button class="btn btn-primary" id="typeTextSubmit">Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- Click modal -->
+<div id="clickModal" class="modal-overlay hidden">
+  <div class="modal">
+    <h3><i class="ti ti-click"></i> Mouse Click</h3>
+    <label>Target device</label>
+    <select id="clickDevice"></select>
+    <div class="modal-row">
+      <div>
+        <label>X</label>
+        <input type="number" id="clickX" value="0" />
+      </div>
+      <div>
+        <label>Y</label>
+        <input type="number" id="clickY" value="0" />
+      </div>
+    </div>
+    <div class="modal-row">
+      <div>
+        <label>Button</label>
+        <select id="clickButton">
+          <option value="left">Left</option>
+          <option value="right">Right</option>
+        </select>
+      </div>
+      <div>
+        <label>Click type</label>
+        <select id="clickType">
+          <option value="single">Single</option>
+          <option value="double">Double</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-close-modal>Cancel</button>
+      <button class="btn btn-primary" id="clickSubmit">Click</button>
+    </div>
+  </div>
+</div>
+
+<!-- Image / results viewer modal -->
+<div id="viewerModal" class="modal-overlay hidden">
+  <div class="modal modal--wide">
+    <h3 id="viewerTitle"><i class="ti ti-photo"></i> Result</h3>
+    <div id="viewerBody" class="viewer-body"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-close-modal>Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="toastContainer" class="toast-container"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
