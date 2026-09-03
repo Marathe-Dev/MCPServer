@@ -49,7 +49,7 @@ export function registerShowDashboardTool(server, deviceRegistry) {
             {
                 uri: DASHBOARD_RESOURCE_URI,
                 mimeType: RESOURCE_MIME,
-                text: buildDashboardWidget(),
+                text: buildDashboardWidget(deviceRegistry.listDevices()),
                 _meta: { ui: { prefersBorder: true } },
             },
         ],

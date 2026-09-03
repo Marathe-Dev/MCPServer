@@ -1,15 +1,21 @@
+import type { DeviceInfo } from "../relay/device-registry.js";
+
 /**
- * Builds the static MCP Apps "View" (the dashboard widget HTML) served as a
- * `ui://` resource. Per the MCP Apps spec (SEP-1865) this HTML is a template
- * with NO baked-in data: the host fetches it once via `resources/read`, then
- * pushes live device data into it via `ui/notifications/tool-result` and the
- * app-only `get_dashboard_data` tool. All host communication is JSON-RPC 2.0
- * over `postMessage` (ui/initialize handshake, tools/call, size-changed).
+ * Builds the MCP Apps "View" (the dashboard widget HTML) served as a `ui://`
+ * resource. A snapshot of the current devices is baked in at read time so the
+ * widget renders **immediately** on load, with no dependency on the host's
+ * async data delivery (which not every MCP Apps host wires up the same way).
+ * Live updates still layer on top: the widget refreshes via the app-only
+ * `get_dashboard_data` tool and `ui/notifications/tool-result`. All host
+ * communication is JSON-RPC 2.0 over `postMessage` (ui/initialize handshake,
+ * tools/call, size-changed).
  *
  * Kept dependency-free and self-contained: inline CSS + inline SVG only (no
  * CDNs), so it renders under the host's restrictive default CSP.
  */
-export function buildDashboardWidget(): string {
+export function buildDashboardWidget(initialDevices: DeviceInfo[]): string {
+  // Escape "<" so a device name can never break out of the <script> block.
+  const initialJson = JSON.stringify(initialDevices).replace(/</g, "\\u003c");
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"/>
 <style>
@@ -89,6 +95,7 @@ tr:last-child td{border-bottom:none}
 (function(){
   "use strict";
   var state = { devices: [] };
+  var INITIAL = ${initialJson};
   var nextId = 1, pending = {};
 
   var ICON = {
@@ -241,19 +248,22 @@ tr:last-child td{border-bottom:none}
   }
 
   async function init(){
-    try{
-      var res = await rpc("ui/initialize", {
-        protocolVersion: "2026-01-26",
-        capabilities: {},
-        appCapabilities: { availableDisplayModes: ["inline"] },
-        clientInfo: { name: "remotepc-dashboard", version: "1.0.0" }
-      });
-      notify("ui/notifications/initialized", {});
-      if(res && res.hostContext && res.hostContext.theme) document.documentElement.setAttribute("data-theme", res.hostContext.theme);
-    }catch(e){ /* non-MCP-Apps host: still fetch + render below */ }
-    refresh();
+    // Render the baked-in snapshot first so the widget is never blank,
+    // regardless of whether the host wires up async data delivery.
+    render(INITIAL);
     reportSize();
     if(window.ResizeObserver){ new ResizeObserver(reportSize).observe(document.body); }
+    // Best-effort MCP Apps handshake + live refresh (ignored by non-Apps hosts).
+    rpc("ui/initialize", {
+      protocolVersion: "2026-01-26",
+      capabilities: {},
+      appCapabilities: { availableDisplayModes: ["inline"] },
+      clientInfo: { name: "remotepc-dashboard", version: "1.0.0" }
+    }).then(function(res){
+      notify("ui/notifications/initialized", {});
+      if(res && res.hostContext && res.hostContext.theme) document.documentElement.setAttribute("data-theme", res.hostContext.theme);
+      refresh();
+    }, function(){ refresh(); });
   }
   init();
 })();

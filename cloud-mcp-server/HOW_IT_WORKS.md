@@ -183,21 +183,22 @@ Three pieces make it work, all in
 
 1. **A registered UI resource** — `server.registerResource("remotepc-dashboard-ui", "ui://remotepc-dashboard", { mimeType: "text/html;profile=mcp-app" }, …)`.
    Its HTML comes from
-   [src/api/dashboard-widget.ts](src/api/dashboard-widget.ts)`.buildDashboardWidget()`
-   — a **static** template (no baked-in data), self-contained (inline CSS +
-   inline SVG, no CDNs, so it renders under the host's restrictive default
-   CSP).
+   [src/api/dashboard-widget.ts](src/api/dashboard-widget.ts)`.buildDashboardWidget(devices)`
+   — self-contained (inline CSS + inline SVG, no CDNs, so it renders under
+   the host's restrictive default CSP). A snapshot of the current devices is
+   **baked into the HTML at `resources/read` time** so the widget renders
+   immediately on load, even if a host doesn't wire up async data delivery.
 2. **Tool→UI linkage** — the `show_dashboard` tool declares
    `_meta.ui.resourceUri = "ui://remotepc-dashboard"`. The host sees this,
    fetches the resource via `resources/read`, and renders it. Its handler
    returns a Markdown summary (text-only fallback) **and** the device
    snapshot as `structuredContent`.
-3. **Live data + interactivity over JSON-RPC** — the widget acts as a tiny
-   MCP client over `postMessage`. On load it does the `ui/initialize`
-   handshake, then receives the device list via the host's
-   `ui/notifications/tool-result` (the `show_dashboard` `structuredContent`)
-   and/or by calling the app-only `get_dashboard_data` tool. Every button
-   issues a standard `tools/call` (`screenshot`, `type_text`, `mouse_click`,
+3. **Live updates + interactivity over JSON-RPC** — the widget acts as a
+   tiny MCP client over `postMessage`. It first renders the baked snapshot,
+   then does the `ui/initialize` handshake and refreshes live data via the
+   app-only `get_dashboard_data` tool (and the host's
+   `ui/notifications/tool-result`). Every button issues a standard
+   `tools/call` (`screenshot`, `type_text`, `mouse_click`,
    `get_window_list`) which the host proxies back to this server; results
    (e.g. the screenshot PNG) render inline in the widget. It also emits
    `ui/notifications/size-changed` so the host sizes the iframe to fit.
