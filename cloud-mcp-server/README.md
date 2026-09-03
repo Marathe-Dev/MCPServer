@@ -28,32 +28,45 @@ npm start
 This exposes:
 - `http://<host>:<port>/mcp` — one universal MCP endpoint; every tool call names its
   target device via a `deviceName` argument (see `list_devices` to discover connected ones).
+  This is also where the interactive in-agent dashboard comes from (`show_dashboard` tool).
 - `ws://<host>:<port>/device-link` — WebSocket endpoint a local-tool-service connects to.
-- `http://<host>:<port>/dashboard` — web dashboard UI (Option A, see below).
-- `http://<host>:<port>/api/*` — REST API consumed by the dashboard (Option A) and the
-  `show_dashboard` MCP tool's HTML widget (Option B).
+- `http://<host>:<port>/dashboard` — optional standalone web dashboard UI (Option A, below).
+- `http://<host>:<port>/api/*` — REST API used by the standalone web dashboard (Option A).
 
-## Dashboard (Option A — web) and `show_dashboard` tool (Option B — desktop agent widget)
+## Dashboard — two ways to see it
 
-Two ways to view/control connected devices without an MCP client typing raw tool calls:
+Both front-ends read the **same** device registry and drive the **same** relay path to
+devices. Pick whichever fits.
 
-- **Web dashboard**: open `http://<host>:<port>/dashboard` in a browser. Plain HTML/CSS/JS
-  (no build step), served as static files from [dashboard/](dashboard/). Shows device cards
-  (name, OS, status), Quick Actions (List Devices, Screenshot All, Type Text, Click), and a
-  System Monitor table. Polls `GET /api/devices` every 30s — no WebSocket push.
-- **`show_dashboard` MCP tool**: callable from any MCP client. Returns two content blocks so
-  it degrades gracefully:
-  1. A Markdown summary table + a link to the full web dashboard — renders in every client,
-     including chat UIs with no HTML support (e.g. VS Code Copilot Chat).
-  2. An embedded `text/html` resource containing the *same* dashboard UI inlined as one
-     self-contained document — rendered inline by MCP clients that support HTML/resource
-     content (e.g. Claude.ai/Claude Desktop artifacts).
+### Option B (primary) — interactive dashboard inside the agent (`show_dashboard` tool)
 
-  Set `PUBLIC_URL` (e.g. `https://your-domain.example`) so the widget's "Open full
-  dashboard" link and embedded API calls point somewhere reachable; it otherwise falls back
-  to `http://<HOST>:<PORT>` (with `0.0.0.0` normalized to `localhost`).
+This is the main path and needs **no browser**. When the user asks something like "show me
+the connected devices dashboard", the agent calls the `show_dashboard` MCP tool. It returns:
 
-### REST API
+  1. An **MCP-UI resource** — a `ui://` HTML document rendered *inline in the agent* as an
+     interactive widget (device cards, quick actions, System Monitor). Its buttons call the
+     host agent's own MCP tools via `postMessage` (the MCP-UI
+     `{ type: "tool", payload: { toolName, params } }` convention) — "Screenshot" →
+     `screenshot`, "Type" → `type_text`, X/Y + click → `mouse_click`, "Windows" →
+     `get_window_list`, "List Devices" → `list_devices`, "Reload Dashboard" →
+     `show_dashboard`. Device data is baked into the widget as a snapshot, so it renders
+     instantly with no network call from the sandboxed iframe.
+  2. A Markdown summary table as a **fallback** — so clients that don't render HTML/MCP-UI
+     (e.g. plain chat UIs) still get the device list as text.
+
+  Rendering the interactive widget requires an **MCP-UI-capable host** (e.g. Goose, or apps
+  built with the `@mcp-ui/client` renderer). Non-UI clients simply show the Markdown table.
+  Set `PUBLIC_URL` so the widget's "Open full web dashboard" link points somewhere
+  reachable; it otherwise falls back to `http://<HOST>:<PORT>` (`0.0.0.0` → `localhost`).
+
+### Option A (optional) — standalone web dashboard
+
+Open `http://<host>:<port>/dashboard` in a browser. Plain HTML/CSS/JS (no build step),
+served as static files from [dashboard/](dashboard/). Shows device cards (name, OS, status),
+Quick Actions (List Devices, Screenshot All, Type Text, Click), and a System Monitor table.
+Polls `GET /api/devices` every 30s and calls the REST API below on button clicks.
+
+### REST API (backs Option A)
 
 | Method & Path | Body | Description |
 | --- | --- | --- |

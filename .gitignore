@@ -35,7 +35,21 @@ bower_components
 .lock-wscript
 
 # Compiled binary addons (https://nodejs.org/api/addons.html)
+# Top-level and per-project build outputs — do NOT commit these built artifacts
+# Keep source/TypeScript in the repo; build artifacts should be produced by CI
+build/
+/local-tool-service/build/
+/local-mcp-server/build/
+/cloud-mcp-server/build/
+
+# Compiled binary addons (https://nodejs.org/api/addons.html)
 build/Release
+/local-tool-service/build/Release
+/local-mcp-server/build/Release
+/cloud-mcp-server/build/Release
+
+# Build-test outputs (optional, ignore if your CI generates them)
+**/build-test/
 
 # Dependency directories
 node_modules/

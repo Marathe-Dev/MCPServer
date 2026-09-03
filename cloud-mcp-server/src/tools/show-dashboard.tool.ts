@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import type { DeviceInfo, DeviceRegistry } from "../relay/device-registry.js";
-import { buildDashboardHtml } from "../api/dashboard-html.js";
+import { buildDashboardWidget } from "../api/dashboard-widget.js";
 
 function resolvePublicUrl(): string {
   if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/$/, "");
@@ -20,11 +20,11 @@ function toMarkdownTable(devices: DeviceInfo[]): string {
 }
 
 /**
- * `show_dashboard` — the "desktop agent widget", generalized across MCP
- * clients: every client gets a Markdown summary + link (works everywhere,
- * including clients with no HTML rendering like most chat UIs), and clients
- * that support HTML/resource content additionally get the same dashboard
- * UI as an inline widget.
+ * `show_dashboard` — renders the connected-devices dashboard INLINE inside
+ * the agent. Returns an MCP-UI resource (a `ui://` HTML document whose
+ * buttons drive this server's other MCP tools via `postMessage`) so
+ * MCP-UI-capable hosts show an interactive widget, plus a Markdown summary
+ * fallback for clients that only render text.
  */
 export function registerShowDashboardTool(
   server: McpServer,
@@ -34,7 +34,7 @@ export function registerShowDashboardTool(
     "show_dashboard",
     {
       description:
-        "Show the connected-devices dashboard: a Markdown summary table (works in any MCP client) plus an inline HTML widget for clients that render HTML/resource content.",
+        "Show the connected-devices dashboard as an interactive inline widget (MCP-UI). Buttons trigger the other RemotePC tools (screenshot, type_text, mouse_click, get_window_list, list_devices). Call this whenever the user asks to see or open the devices dashboard.",
       inputSchema: z.object({}),
     },
     async () => {
@@ -47,22 +47,23 @@ export function registerShowDashboardTool(
         "",
         toMarkdownTable(devices),
         "",
-        `Open the full dashboard: ${publicUrl}/dashboard`,
+        `Interactive dashboard rendered above (MCP-UI). Full web dashboard: ${publicUrl}/dashboard`,
       ].join("\n");
 
       return {
         content: [
-          { type: "text", text: summary },
           {
             type: "resource",
             resource: {
-              uri: "ui://remotepc-dashboard",
+              uri: `ui://remotepc-dashboard/${Date.now()}`,
               mimeType: "text/html",
-              text: buildDashboardHtml(publicUrl),
+              text: buildDashboardWidget(devices, publicUrl),
             },
           },
+          { type: "text", text: summary },
         ],
       };
     },
   );
 }
+
