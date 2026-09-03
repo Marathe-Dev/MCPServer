@@ -40,24 +40,31 @@ devices. Pick whichever fits.
 
 ### Option B (primary) — interactive dashboard inside the agent (`show_dashboard` tool)
 
-This is the main path and needs **no browser**. When the user asks something like "show me
-the connected devices dashboard", the agent calls the `show_dashboard` MCP tool. It returns:
+This is the main path and needs **no browser**. It uses the **MCP Apps** standard
+([SEP-1865](https://github.com/modelcontextprotocol/ext-apps), extension
+`io.modelcontextprotocol/ui`), which hosts like **Claude**, VS Code, Goose, Postman, and
+MCPJam render inline as an interactive widget.
 
-  1. An **MCP-UI resource** — a `ui://` HTML document rendered *inline in the agent* as an
-     interactive widget (device cards, quick actions, System Monitor). Its buttons call the
-     host agent's own MCP tools via `postMessage` (the MCP-UI
-     `{ type: "tool", payload: { toolName, params } }` convention) — "Screenshot" →
-     `screenshot`, "Type" → `type_text`, X/Y + click → `mouse_click`, "Windows" →
-     `get_window_list`, "List Devices" → `list_devices`, "Reload Dashboard" →
-     `show_dashboard`. Device data is baked into the widget as a snapshot, so it renders
-     instantly with no network call from the sandboxed iframe.
-  2. A Markdown summary table as a **fallback** — so clients that don't render HTML/MCP-UI
-     (e.g. plain chat UIs) still get the device list as text.
+When the user asks something like "show me the connected devices dashboard", the agent calls
+`show_dashboard`. Three pieces make it interactive:
 
-  Rendering the interactive widget requires an **MCP-UI-capable host** (e.g. Goose, or apps
-  built with the `@mcp-ui/client` renderer). Non-UI clients simply show the Markdown table.
-  Set `PUBLIC_URL` so the widget's "Open full web dashboard" link points somewhere
-  reachable; it otherwise falls back to `http://<HOST>:<PORT>` (`0.0.0.0` → `localhost`).
+  1. **A registered UI resource** — `ui://remotepc-dashboard`, served via `resources/read`
+     with MIME type `text/html;profile=mcp-app`. It's a self-contained widget (inline CSS +
+     inline SVG, no CDNs) that the host renders in a sandboxed iframe.
+  2. **Tool→UI linkage** — the `show_dashboard` tool declares `_meta.ui.resourceUri`, so the
+     host knows which resource to render. The tool also returns a Markdown summary (text
+     fallback) plus the device list as `structuredContent`.
+  3. **Interactivity over JSON-RPC** — the widget acts as a tiny MCP client over
+     `postMessage`: it does the `ui/initialize` handshake, receives live device data via
+     `ui/notifications/tool-result` and the app-only `get_dashboard_data` tool, and every
+     button issues a standard `tools/call` (`screenshot`, `type_text`, `mouse_click`,
+     `get_window_list`) that the host proxies back to this server. Results (e.g. the
+     screenshot PNG) render inline in the widget.
+
+  Hosts **without** MCP Apps support ignore `_meta.ui` / the `ui://` resource and simply
+  show the `show_dashboard` Markdown table — graceful degradation, per the spec. Set
+  `PUBLIC_URL` so any absolute links resolve; it otherwise falls back to
+  `http://<HOST>:<PORT>` (`0.0.0.0` → `localhost`).
 
 ### Option A (optional) — standalone web dashboard
 

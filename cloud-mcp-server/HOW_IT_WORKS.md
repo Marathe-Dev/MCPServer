@@ -158,62 +158,70 @@ Registered in [src/tools/index.ts](src/tools/index.ts):
 | `mouse_move` / `mouse_click` | Moves / clicks the mouse on the target device. |
 | `type_text` / `key_press` | Types text / presses a key on the target device. |
 | `get_window_list` | Lists open windows on the target device. |
-| `show_dashboard` | Renders the connected-devices dashboard **inline inside the agent** as an interactive MCP-UI widget (buttons drive the other tools), plus a Markdown table fallback for text-only clients. This is the primary way to "see the dashboard" — no browser required. |
+| `show_dashboard` | Renders the connected-devices dashboard **inline inside the agent** as an interactive **MCP Apps** widget (buttons drive the other tools), plus a Markdown table fallback for text-only clients. The primary way to "see the dashboard" — no browser required. |
+| `get_dashboard_data` | App-only (`_meta.ui.visibility: ["app"]`, hidden from the agent). Returns the current device list as `structuredContent`; the dashboard widget calls it to (re)load/refresh its data. |
 
-Every one of these (except `list_devices` and `show_dashboard`) takes a
-`deviceName` argument and follows the exact round trip described in section
-6 — only the `tool` name and `args` shape change.
+Every one of these (except `list_devices`, `show_dashboard`, and
+`get_dashboard_data`) takes a `deviceName` argument and follows the exact
+round trip described in section 6 — only the `tool` name and `args` shape
+change.
 
 ## 8. The dashboard — two ways to see it
 
 There are two independent front-ends, both reading the **same**
 `DeviceRegistry` and driving the **same** relay path to devices:
 
-### 8a. Inline in the agent (primary) — the `show_dashboard` tool + MCP-UI
+### 8a. Inline in the agent (primary) — `show_dashboard` + MCP Apps (SEP-1865)
 
-When the user asks "show me the devices dashboard", the agent calls the
-`show_dashboard` tool. The tool returns an **MCP-UI resource** — an HTML
-document with a `ui://…` URI and `text/html` mime type — that MCP-UI-capable
-hosts render inline as an interactive widget (a sandboxed iframe). No web
-browser and no separate server visit is involved.
+This follows the **MCP Apps** standard (`io.modelcontextprotocol/ui`), which
+hosts like **Claude**, VS Code, Goose, Postman, and MCPJam render inline as
+an interactive widget in a sandboxed iframe. (The older MCP-UI *inline*
+`postMessage` pattern is deliberately **not** used — Claude ignores it.)
 
-Flow, file by file:
+Three pieces make it work, all in
+[src/tools/show-dashboard.tool.ts](src/tools/show-dashboard.tool.ts):
 
-1. **[src/tools/show-dashboard.tool.ts](src/tools/show-dashboard.tool.ts)** —
-   reads a snapshot of every device from `deviceRegistry.listDevices()` and
-   asks the widget builder to render it.
-2. **[src/api/dashboard-widget.ts](src/api/dashboard-widget.ts)**`.buildDashboardWidget(devices, publicUrl)`
-   returns one self-contained HTML string: the device snapshot is baked in
-   as JSON (so the widget shows instantly, with **no network call from the
-   iframe**), styles are inline, icons are inline SVG (so it renders even
-   when the sandbox blocks CDNs).
-3. The tool returns two content blocks: the `resource` (the widget) first,
-   then a `text` Markdown summary as a fallback for clients that don't
-   render HTML.
-4. **Interactivity** uses the MCP-UI convention: every button calls
-   `window.parent.postMessage({ type: "tool", payload: { toolName, params } }, "*")`.
-   The host agent receives that and invokes the corresponding MCP tool on
-   this same server — e.g. "Screenshot" → `screenshot({ deviceName })`,
-   "Type" → `type_text`, the X/Y + click button → `mouse_click`, "Windows"
-   → `get_window_list`, "List Devices" → `list_devices`, and "Reload
-   Dashboard" → `show_dashboard` again. The widget never talks to the REST
-   API; it drives the agent's own tools, so it works wherever the tools do.
-   It also posts `ui-size-change` so the host can size the iframe to fit.
+1. **A registered UI resource** — `server.registerResource("remotepc-dashboard-ui", "ui://remotepc-dashboard", { mimeType: "text/html;profile=mcp-app" }, …)`.
+   Its HTML comes from
+   [src/api/dashboard-widget.ts](src/api/dashboard-widget.ts)`.buildDashboardWidget()`
+   — a **static** template (no baked-in data), self-contained (inline CSS +
+   inline SVG, no CDNs, so it renders under the host's restrictive default
+   CSP).
+2. **Tool→UI linkage** — the `show_dashboard` tool declares
+   `_meta.ui.resourceUri = "ui://remotepc-dashboard"`. The host sees this,
+   fetches the resource via `resources/read`, and renders it. Its handler
+   returns a Markdown summary (text-only fallback) **and** the device
+   snapshot as `structuredContent`.
+3. **Live data + interactivity over JSON-RPC** — the widget acts as a tiny
+   MCP client over `postMessage`. On load it does the `ui/initialize`
+   handshake, then receives the device list via the host's
+   `ui/notifications/tool-result` (the `show_dashboard` `structuredContent`)
+   and/or by calling the app-only `get_dashboard_data` tool. Every button
+   issues a standard `tools/call` (`screenshot`, `type_text`, `mouse_click`,
+   `get_window_list`) which the host proxies back to this server; results
+   (e.g. the screenshot PNG) render inline in the widget. It also emits
+   `ui/notifications/size-changed` so the host sizes the iframe to fit.
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant Agent as MCP Client (MCP-UI host)
+    participant Agent as MCP Apps host (e.g. Claude)
     participant Cloud as cloud-mcp-server
     User->>Agent: "show me the devices dashboard"
-    Agent->>Cloud: tool call: show_dashboard
-    Cloud-->>Agent: resource (ui:// HTML widget) + text summary
-    Agent-->>User: renders interactive widget inline
-    User->>Agent: clicks "Screenshot" (widget postMessage: tool)
-    Agent->>Cloud: tool call: screenshot({deviceName})
+    Agent->>Cloud: tools/call show_dashboard
+    Cloud-->>Agent: text summary + structuredContent(devices), _meta.ui.resourceUri
+    Agent->>Cloud: resources/read ui://remotepc-dashboard
+    Cloud-->>Agent: widget HTML (text/html;profile=mcp-app)
+    Agent-->>User: renders interactive widget inline (sandboxed iframe)
+    User->>Agent: clicks "Screenshot" (widget -> tools/call)
+    Agent->>Cloud: tools/call screenshot({deviceName})
     Cloud-->>Agent: PNG image result
-    Agent-->>User: shows the screenshot in the conversation
+    Agent-->>User: widget shows the screenshot inline
 ```
+
+> Hosts **without** MCP Apps support (e.g. plain chat UIs) ignore
+> `_meta.ui` and the `ui://` resource, and simply show the `show_dashboard`
+> Markdown table — graceful degradation, per the spec.
 
 ### 8b. Standalone web page (optional) — REST API + static UI
 
@@ -243,7 +251,7 @@ a small REST API and a static dashboard:
 | [src/services/implementations/relay/](src/services/implementations/relay) | Translates each service method call into a `RelayToolName` + `sendRequest`. |
 | [src/services/action-dispatcher.ts](src/services/action-dispatcher.ts) | Same dispatch, keyed by a plain action name, for the REST `/api/action` route. |
 | [src/api/dashboard-router.ts](src/api/dashboard-router.ts) | REST API for the standalone web dashboard. |
-| [src/api/dashboard-widget.ts](src/api/dashboard-widget.ts) | Builds the interactive inline MCP-UI widget the `show_dashboard` tool returns. |
+| [src/api/dashboard-widget.ts](src/api/dashboard-widget.ts) | Builds the static MCP Apps widget HTML (JSON-RPC over postMessage) served as the `ui://remotepc-dashboard` resource. |
 | [dashboard/](dashboard/) | The standalone web dashboard UI (plain HTML/CSS/JS). |
 | [src/tools/](src/tools) | One file per MCP tool: schema + handler. |
 

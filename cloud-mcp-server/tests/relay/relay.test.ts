@@ -116,11 +116,12 @@ async function withRegisteredDevice(run: (client: Client) => Promise<void>): Pro
   }
 }
 
-test("discovers all eight MCP tools through the relay", async () => {
+test("discovers all nine MCP tools through the relay", async () => {
   await withRegisteredDevice(async (client) => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepStrictEqual(names, [
+      "get_dashboard_data",
       "get_window_list",
       "key_press",
       "list_devices",
