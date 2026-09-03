@@ -1,87 +1,4 @@
-import type { DeviceInfo } from "../relay/device-registry.js";
-
-/** Inline SVG platform icons (server-side copy; the widget script has its own for re-renders). */
-const PLATFORM_ICON: Record<string, string> = {
-  win32:
-    '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 5.5 10 4.5v7H3zM10 12.5v7L3 18.5v-6zM11 4.3 21 3v8.5H11zM21 12.5V21l-10-1.3v-7.2z"/></svg>',
-  darwin:
-    '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M16 3c.1 1.2-.4 2.3-1.1 3.1-.7.9-1.9 1.5-3 1.4-.1-1.1.4-2.3 1.1-3 .8-.9 2-1.5 3-1.5zM19.5 17.4c-.5 1.2-.8 1.7-1.4 2.7-.9 1.4-2.2 3.2-3.8 3.2-1.4 0-1.8-.9-3.7-.9s-2.3.9-3.7.9c-1.6 0-2.8-1.6-3.7-3C.9 17.1.6 12.3 2.6 9.9c1-1.2 2.4-1.9 3.8-1.9 1.5 0 2.4.9 3.7.9 1.2 0 2-.9 3.7-.9 1.3 0 2.6.7 3.6 1.9-3.1 1.7-2.6 6.2.1 7.6z"/></svg>',
-  linux:
-    '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2c2 0 3 2 3 4 0 1 .5 2 1 3 1 1.5 2 3 2 5 0 1-.5 2-1 3 .5 1 1 2 0 3-1 .5-2 0-3-.5-.5.5-1.5 1-3 1s-2.5-.5-3-1c-1 .5-2 1-3 .5-1-1-.5-2 0-3-.5-1-1-2-1-3 0-2 1-3.5 2-5 .5-1 1-2 1-3 0-2 1-4 3-4z"/></svg>',
-  unknown:
-    '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M4 5h16v11H4zM2 19h20v2H2z"/></svg>',
-};
-
-function esc(value: string): string {
-  return String(value == null ? "" : value).replace(/[&<>"']/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string),
-  );
-}
-
-function iconFor(platform: string): string {
-  return PLATFORM_ICON[platform] ?? PLATFORM_ICON.unknown;
-}
-
-function relTime(iso: string): string {
-  const s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
-  if (Number.isNaN(s)) return "never";
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
-
-function cardHtml(d: DeviceInfo): string {
-  const on = d.status === "online";
-  const dis = on ? "" : "disabled";
-  const id = esc(d.deviceId);
-  return (
-    '<div class="card">' +
-    `<div class="card__top"><div class="card__name">${iconFor(d.platform)}<span title="${esc(d.deviceName)}">${esc(d.deviceName)}</span></div>` +
-    `<span class="badge ${on ? "on" : "off"}">${esc(d.status)}</span></div>` +
-    `<div class="card__meta">${esc(d.platform)} · last active ${relTime(d.lastActive)}</div>` +
-    '<div class="card__actions">' +
-    `<button class="btn" ${dis} data-tool="screenshot" data-device="${id}">Screenshot</button>` +
-    `<button class="btn" ${dis} data-tool="get_window_list" data-device="${id}">Windows</button>` +
-    "</div>" +
-    '<div class="card__form">' +
-    `<div class="row"><input type="text" placeholder="Text to type…" data-type-input="${id}" ${dis}/><button class="btn" ${dis} data-type-send="${id}">Type</button></div>` +
-    `<div class="row"><input type="number" placeholder="X" data-x="${id}" ${dis}/><input type="number" placeholder="Y" data-y="${id}" ${dis}/><button class="btn" ${dis} data-click="${id}">Click</button></div>` +
-    "</div></div>"
-  );
-}
-
-function rowHtml(d: DeviceInfo): string {
-  const on = d.status === "online";
-  return `<tr><td>${esc(d.deviceName)}</td><td><span class="badge ${on ? "on" : "off"}">${esc(d.status)}</span></td><td>${relTime(d.lastActive)}</td></tr>`;
-}
-
-/**
- * Builds the MCP Apps "View" (the dashboard widget HTML) served as a `ui://`
- * resource. The device cards/rows are **server-rendered into the HTML body**
- * (not just via the script) so the dashboard is visible with pure HTML+CSS —
- * even if a host's sandbox CSP blocks/breaks the inline script. The script
- * then only *enhances*: wires up buttons and refreshes live data via the
- * app-only `get_dashboard_data` tool. All host communication is JSON-RPC 2.0
- * over `postMessage` (ui/initialize handshake, tools/call, size-changed).
- *
- * Kept dependency-free and self-contained: inline CSS + inline SVG only (no
- * CDNs), so it renders under the host's restrictive default CSP.
- */
-export function buildDashboardWidget(initialDevices: DeviceInfo[]): string {
-  // Escape "<" so a device name can never break out of the <script> block.
-  const initialJson = JSON.stringify(initialDevices).replace(/</g, "\\u003c");
-  const onlineCount = initialDevices.filter((d) => d.status === "online").length;
-  const countLabel = `${onlineCount}/${initialDevices.length} online`;
-  const cards = initialDevices.length
-    ? initialDevices.map(cardHtml).join("")
-    : '<p class="empty">No devices connected. Start a local-tool-service.</p>';
-  const rows = initialDevices.length
-    ? initialDevices.map(rowHtml).join("")
-    : '<tr><td colspan="3" class="empty">No data</td></tr>';
-  return `<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"/>
 <style>
 :root{
@@ -141,7 +58,7 @@ tr:last-child td{border-bottom:none}
 <body>
   <div class="head">
     <h1><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M4 5h16v11H4zM2 19h20v2H2z"/></svg> RemotePC Dashboard</h1>
-    <span class="count" id="count">${countLabel}</span>
+    <span class="count" id="count">3/3 online</span>
   </div>
 
   <div class="toolbar">
@@ -149,9 +66,9 @@ tr:last-child td{border-bottom:none}
     <button class="btn" id="shotAll">Screenshot All</button>
   </div>
 
-  <div class="panel"><h2>Connected Devices</h2><div class="grid" id="grid">${cards}</div></div>
+  <div class="panel"><h2>Connected Devices</h2><div class="grid" id="grid"><div class="card"><div class="card__top"><div class="card__name"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M16 3c.1 1.2-.4 2.3-1.1 3.1-.7.9-1.9 1.5-3 1.4-.1-1.1.4-2.3 1.1-3 .8-.9 2-1.5 3-1.5zM19.5 17.4c-.5 1.2-.8 1.7-1.4 2.7-.9 1.4-2.2 3.2-3.8 3.2-1.4 0-1.8-.9-3.7-.9s-2.3.9-3.7.9c-1.6 0-2.8-1.6-3.7-3C.9 17.1.6 12.3 2.6 9.9c1-1.2 2.4-1.9 3.8-1.9 1.5 0 2.4.9 3.7.9 1.2 0 2-.9 3.7-.9 1.3 0 2.6.7 3.6 1.9-3.1 1.7-2.6 6.2.1 7.6z"/></svg><span title="Hemant-Mac">Hemant-Mac</span></div><span class="badge on">online</span></div><div class="card__meta">darwin · last active 0s ago</div><div class="card__actions"><button class="btn"  data-tool="screenshot" data-device="a">Screenshot</button><button class="btn"  data-tool="get_window_list" data-device="a">Windows</button></div><div class="card__form"><div class="row"><input type="text" placeholder="Text to type…" data-type-input="a" /><button class="btn"  data-type-send="a">Type</button></div><div class="row"><input type="number" placeholder="X" data-x="a" /><input type="number" placeholder="Y" data-y="a" /><button class="btn"  data-click="a">Click</button></div></div></div><div class="card"><div class="card__top"><div class="card__name"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 5.5 10 4.5v7H3zM10 12.5v7L3 18.5v-6zM11 4.3 21 3v8.5H11zM21 12.5V21l-10-1.3v-7.2z"/></svg><span title="Hemant-TestSystem">Hemant-TestSystem</span></div><span class="badge on">online</span></div><div class="card__meta">win32 · last active 0s ago</div><div class="card__actions"><button class="btn"  data-tool="screenshot" data-device="b">Screenshot</button><button class="btn"  data-tool="get_window_list" data-device="b">Windows</button></div><div class="card__form"><div class="row"><input type="text" placeholder="Text to type…" data-type-input="b" /><button class="btn"  data-type-send="b">Type</button></div><div class="row"><input type="number" placeholder="X" data-x="b" /><input type="number" placeholder="Y" data-y="b" /><button class="btn"  data-click="b">Click</button></div></div></div><div class="card"><div class="card__top"><div class="card__name"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 5.5 10 4.5v7H3zM10 12.5v7L3 18.5v-6zM11 4.3 21 3v8.5H11zM21 12.5V21l-10-1.3v-7.2z"/></svg><span title="HemantM">HemantM</span></div><span class="badge on">online</span></div><div class="card__meta">win32 · last active 0s ago</div><div class="card__actions"><button class="btn"  data-tool="screenshot" data-device="c">Screenshot</button><button class="btn"  data-tool="get_window_list" data-device="c">Windows</button></div><div class="card__form"><div class="row"><input type="text" placeholder="Text to type…" data-type-input="c" /><button class="btn"  data-type-send="c">Type</button></div><div class="row"><input type="number" placeholder="X" data-x="c" /><input type="number" placeholder="Y" data-y="c" /><button class="btn"  data-click="c">Click</button></div></div></div></div></div>
   <div class="panel"><h2>System Monitor</h2>
-    <table><thead><tr><th>Device</th><th>Status</th><th>Last Active</th></tr></thead><tbody id="rows">${rows}</tbody></table>
+    <table><thead><tr><th>Device</th><th>Status</th><th>Last Active</th></tr></thead><tbody id="rows"><tr><td>Hemant-Mac</td><td><span class="badge on">online</span></td><td>0s ago</td></tr><tr><td>Hemant-TestSystem</td><td><span class="badge on">online</span></td><td>0s ago</td></tr><tr><td>HemantM</td><td><span class="badge on">online</span></td><td>0s ago</td></tr></tbody></table>
   </div>
 
   <div id="viewer"></div>
@@ -160,7 +77,7 @@ tr:last-child td{border-bottom:none}
 (function(){
   "use strict";
   var state = { devices: [] };
-  var INITIAL = ${initialJson};
+  var INITIAL = [{"deviceId":"a","deviceName":"Hemant-Mac","platform":"darwin","status":"online","connectedAt":"2026-09-03T07:54:06.688Z","lastActive":"2026-09-03T07:54:06.688Z"},{"deviceId":"b","deviceName":"Hemant-TestSystem","platform":"win32","status":"online","connectedAt":"2026-09-03T07:54:06.688Z","lastActive":"2026-09-03T07:54:06.688Z"},{"deviceId":"c","deviceName":"HemantM","platform":"win32","status":"online","connectedAt":"2026-09-03T07:54:06.688Z","lastActive":"2026-09-03T07:54:06.688Z"}];
   var nextId = 1, pending = {};
 
   var ICON = {
@@ -254,7 +171,7 @@ tr:last-child td{border-bottom:none}
     var sc = result.structuredContent;
     if(sc && sc.windows){ html += "<ul>"+sc.windows.map(function(w){return "<li>"+esc(w.title)+" — "+w.width+"x"+w.height+(w.isFocused?" (focused)":"")+"</li>";}).join("")+"</ul>"; }
     else if(!img){
-      var txt = (result.content||[]).filter(function(c){return c.type==="text";}).map(function(c){return c.text;}).join("\\n");
+      var txt = (result.content||[]).filter(function(c){return c.type==="text";}).map(function(c){return c.text;}).join("\n");
       html += "<pre>"+esc(txt)+"</pre>";
     }
     html += "</div>";
@@ -333,5 +250,4 @@ tr:last-child td{border-bottom:none}
   init();
 })();
 </script>
-</body></html>`;
-}
+</body></html>
