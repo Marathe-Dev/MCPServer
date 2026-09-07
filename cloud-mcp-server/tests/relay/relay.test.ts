@@ -22,6 +22,13 @@ function fakeToolResult(message: RelayRequestMessage): RelayMessage {
   });
 
   switch (message.tool) {
+    case "cmd.execute": {
+      const args = message.args as { command: string; timeoutMs: number; maxOutputChars: number };
+      assert.equal(args.timeoutMs, 10000);
+      assert.equal(args.maxOutputChars, 65536);
+      return ok({ success: args.command !== "exit /b 7", exitCode: args.command === "exit /b 7" ? 7 : 0,
+        output: "hello\r\n", timedOut: false, truncated: false, backend: FAKE_BACKEND, timestamp });
+    }
     case "mouse.move":
     case "mouse.click": {
       const { x, y } = message.args as { x: number; y: number };
@@ -116,11 +123,12 @@ async function withRegisteredDevice(run: (client: Client) => Promise<void>): Pro
   }
 }
 
-test("discovers all nine MCP tools through the relay", async () => {
+test("discovers all ten MCP tools through the relay", async () => {
   await withRegisteredDevice(async (client) => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepStrictEqual(names, [
+      "cmd",
       "get_dashboard_data",
       "get_window_list",
       "key_press",
@@ -141,6 +149,28 @@ test("list_devices reports the connected fake device", async () => {
     const parsed = JSON.parse(content.text);
     assert.equal(parsed.success, true);
     assert.deepStrictEqual(parsed.devices, [DEVICE_ID]);
+  });
+});
+
+test("cmd relays defaults and surfaces nonzero exit codes as MCP errors", async () => {
+  await withRegisteredDevice(async (client) => {
+    for (const command of ["echo hello", "exit /b 7"]) {
+      const result = await client.callTool({ name: "cmd", arguments: { deviceName: DEVICE_ID, command } });
+      const [content] = result.content as Array<{ text: string }>;
+      const parsed = JSON.parse(content.text);
+      assert.equal(parsed.output, "hello\r\n");
+      assert.equal(parsed.exitCode, command === "echo hello" ? 0 : 7);
+      assert.equal(result.isError, command !== "echo hello");
+    }
+  });
+});
+
+test("cmd rejects multiline input and excessive timeout before relay", async () => {
+  await withRegisteredDevice(async (client) => {
+    for (const args of [{ command: "echo one\necho two" }, { command: "echo hello", timeoutMs: 20001 }]) {
+      const result = await client.callTool({ name: "cmd", arguments: { deviceName: DEVICE_ID, ...args } });
+      assert.equal(result.isError, true);
+    }
   });
 });
 

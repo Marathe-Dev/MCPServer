@@ -10,7 +10,8 @@ export type RelayToolName =
   | "keyboard.typeText"
   | "keyboard.keyPress"
   | "screenshot.capturePrimaryDisplay"
-  | "window.listWindows";
+  | "window.listWindows"
+  | "cmd.execute";
 
 export interface RegisterMessage {
   type: "register";

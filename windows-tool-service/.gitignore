@@ -1,0 +1,8 @@
+bin/
+obj/
+packages/
+.vs/
+*.user
+native/winpty.dll
+native/winpty-agent.exe
+native/WINPTY-LICENSE.txt

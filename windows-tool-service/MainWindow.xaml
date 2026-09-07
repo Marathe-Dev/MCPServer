@@ -1,0 +1,51 @@
+<Window x:Class="WindowsToolService.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Windows MCP Tool Service" Width="760" Height="570"
+        MinWidth="520" MinHeight="460" WindowStartupLocation="CenterScreen"
+        FontFamily="Segoe UI" FontSize="14" Background="WhiteSmoke"
+        Loaded="OnLoaded" Closing="OnClosing">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="125" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <TextBlock Grid.ColumnSpan="2" Text="Windows MCP Tool Service"
+                   FontSize="24" FontWeight="SemiBold" Margin="0,0,0,20" />
+        <Label Grid.Row="1" Content="Cloud URL" Target="{Binding ElementName=cloud}"
+               Padding="0" VerticalAlignment="Center" Margin="0,0,0,12" />
+        <TextBox x:Name="cloud" Grid.Row="1" Grid.Column="1" Padding="6" Margin="0,0,0,12" />
+        <Label Grid.Row="2" Content="Device ID" Target="{Binding ElementName=deviceId}"
+               Padding="0" VerticalAlignment="Center" Margin="0,0,0,12" />
+        <PasswordBox x:Name="deviceId" Grid.Row="2" Grid.Column="1" Padding="6" Margin="0,0,0,12" />
+        <Label Grid.Row="3" Content="Device name" Target="{Binding ElementName=name}"
+               Padding="0" VerticalAlignment="Center" Margin="0,0,0,12" />
+        <TextBox x:Name="name" Grid.Row="3" Grid.Column="1" Padding="6" Margin="0,0,0,12" />
+        <CheckBox x:Name="enableCmd" Grid.Row="4" Grid.ColumnSpan="2"
+                  Content="Allow remote CMD execution" Checked="OnEnableCmdChecked" />
+        <CheckBox x:Name="autoConnect" Grid.Row="5" Grid.ColumnSpan="2" Content="Connect on startup" />
+        <StackPanel Grid.Row="6" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,16,0,12">
+            <Button x:Name="connect" Content="Connect" MinWidth="100" Padding="12,6"
+                    Margin="0,0,12,0" Click="OnConnectClick" />
+            <Button x:Name="disconnect" Content="Disconnect" MinWidth="100" Padding="12,6"
+                    IsEnabled="False" Click="OnDisconnectClick" />
+        </StackPanel>
+        <TextBlock x:Name="state" Grid.Row="7" Grid.ColumnSpan="2" Text="Stopped"
+                   FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock Grid.Row="8" Grid.ColumnSpan="2" Text="Activity" Margin="0,16,0,6" />
+        <TextBox x:Name="activity" Grid.Row="9" Grid.ColumnSpan="2" IsReadOnly="True"
+                 AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" />
+    </Grid>
+</Window>

@@ -3,7 +3,7 @@
  * each connected Local Tool Service. Kept identical (copy) in both projects.
  */
 /** Mirrors the 4 I*Service method names 1:1 so dispatch is a plain switch on both ends. */
-export type RelayToolName = "mouse.move" | "mouse.click" | "keyboard.typeText" | "keyboard.keyPress" | "screenshot.capturePrimaryDisplay" | "window.listWindows";
+export type RelayToolName = "mouse.move" | "mouse.click" | "keyboard.typeText" | "keyboard.keyPress" | "screenshot.capturePrimaryDisplay" | "window.listWindows" | "cmd.execute";
 export interface RegisterMessage {
     type: "register";
     deviceId: string;
