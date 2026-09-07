@@ -22,6 +22,16 @@ namespace WindowsToolService
         {
             try
             {
+                if (args.Length == 2 && args[0] == "--handshake")
+                {
+                    Console.WriteLine("Default TLS protocols: " + System.Net.ServicePointManager.SecurityProtocol);
+                    ProbeHandshakeAsync(args[1]).GetAwaiter().GetResult();
+                    new RelayClient(new AgentConfig(), (tool, arguments, token) => Task.FromResult<object>(null), Console.WriteLine);
+                    Assert(System.Net.ServicePointManager.SecurityProtocol == System.Net.SecurityProtocolType.Tls12, "relay enables TLS 1.2");
+                    Console.WriteLine("Relay TLS configuration probe:");
+                    ProbeHandshakeAsync(args[1]).GetAwaiter().GetResult();
+                    return 0;
+                }
                 if (args.Length == 2 && args[0] == "--relay")
                 {
                     RelayAsync(args[1]).GetAwaiter().GetResult();
@@ -50,6 +60,8 @@ namespace WindowsToolService
                     "legacy settings preserved without enabling startup connections");
                 var startup = serializer.Deserialize<AgentConfig>(serializer.Serialize(new AgentConfig { AutoConnectOnStartup = true }));
                 Assert(startup.AutoConnectOnStartup, "startup preference round trip");
+                new RelayClient(config, (tool, arguments, token) => Task.FromResult<object>(null), Console.WriteLine);
+                Assert(System.Net.ServicePointManager.SecurityProtocol == System.Net.SecurityProtocolType.Tls12, "relay enables TLS 1.2");
                 if (args.Contains("--native"))
                 {
                     NativeAsync().GetAwaiter().GetResult();
@@ -59,6 +71,25 @@ namespace WindowsToolService
                 return 0;
             }
             catch (Exception error) { Console.Error.WriteLine(error); return 1; }
+        }
+
+        private static async Task ProbeHandshakeAsync(string endpoint)
+        {
+            using (var socket = new System.Net.WebSockets.ClientWebSocket())
+            using (var cancellation = new CancellationTokenSource(20000))
+            {
+                try
+                {
+                    await socket.ConnectAsync(new Uri(endpoint), cancellation.Token);
+                    Console.WriteLine("Handshake: " + socket.State);
+                }
+                catch (Exception error)
+                {
+                    for (var detail = error; detail != null; detail = detail.InnerException)
+                        Console.WriteLine(detail.GetType().Name + ": " + detail.Message);
+                }
+                finally { socket.Abort(); }
+            }
         }
 
         private static async Task NativeAsync()

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
@@ -19,6 +20,7 @@ namespace WindowsToolService
 
         internal RelayClient(AgentConfig config, Func<string, IDictionary<string, object>, CancellationToken, Task<object>> dispatch, Action<string> status)
         {
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
             this.config = config;
             this.dispatch = dispatch;
             this.status = status;
@@ -61,8 +63,11 @@ namespace WindowsToolService
                             }
                         }
                     }
-                    catch (OperationCanceledException) { }
-                    catch (Exception error) { status("Connection error: " + error.Message); }
+                    catch (OperationCanceledException)
+                    {
+                        if (!cancellation.IsCancellationRequested) status("Connection timed out.");
+                    }
+                    catch (Exception error) { status("Connection error: " + error.GetBaseException().Message); }
                     finally
                     {
                         connection.Cancel();

@@ -1,5 +1,9 @@
 {
   "servers": {
+    "cloud-mcp": {
+      "type": "http",
+      "url": "https://mcpcloudserver.onrender.com/mcp"
+    },
     "remotepc-mcp": {
       "type": "stdio",
       "command": "node",
