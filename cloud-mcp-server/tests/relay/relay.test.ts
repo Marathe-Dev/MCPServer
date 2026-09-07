@@ -6,9 +6,11 @@ import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/cli
 import WebSocket from "ws";
 
 import { createApp, type CloudApp } from "../../src/app.js";
+import { buildDashboardWidget } from "../../src/api/dashboard-widget.js";
 import type { RelayMessage, RelayRequestMessage } from "../../src/relay/relay-protocol.js";
 
 const DEVICE_ID = "test-device-1";
+const DEVICE_NAME = "Office PC";
 const FAKE_BACKEND = "fake-device";
 
 /** Deterministic stand-in for a Local Tool Service's tool_call responses — no OS access. */
@@ -89,7 +91,7 @@ async function setUpHarness(deviceId: string | undefined): Promise<Harness> {
         deviceSocket?.send(JSON.stringify(fakeToolResult(message)));
       }
     });
-    deviceSocket.send(JSON.stringify({ type: "register", deviceId }));
+    deviceSocket.send(JSON.stringify({ type: "register", deviceId, deviceName: DEVICE_NAME }));
     // Give the server a tick to process the registration before calling tools.
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
@@ -139,6 +141,11 @@ test("discovers all ten MCP tools through the relay", async () => {
       "show_dashboard",
       "type_text",
     ]);
+    const targeted = new Set(["cmd", "get_window_list", "key_press", "mouse_click", "mouse_move", "screenshot", "type_text"]);
+    for (const tool of tools.filter((tool) => targeted.has(tool.name))) {
+      assert.ok(tool.inputSchema.required?.includes("deviceId"), tool.name);
+      assert.ok(!Object.hasOwn(tool.inputSchema.properties ?? {}, "deviceName"), tool.name);
+    }
   });
 });
 
@@ -148,14 +155,57 @@ test("list_devices reports the connected fake device", async () => {
     const [content] = result.content as Array<{ text: string }>;
     const parsed = JSON.parse(content.text);
     assert.equal(parsed.success, true);
-    assert.deepStrictEqual(parsed.devices, [DEVICE_ID]);
+    assert.deepStrictEqual(parsed.devices, [{ deviceId: DEVICE_ID, deviceName: DEVICE_NAME }]);
   });
+});
+
+test("discovery preserves duplicate names, falls back to IDs and excludes offline devices", async () => {
+  const harness = await setUpHarness(DEVICE_ID);
+  try {
+    const socket = harness.deviceSocket!;
+    harness.app.deviceRegistry.register("second-device", socket, { deviceName: DEVICE_NAME });
+    harness.app.deviceRegistry.register("legacy-device", socket);
+    harness.app.deviceRegistry.register("offline-device", socket, { deviceName: "Offline PC" });
+    harness.app.deviceRegistry.unregister("offline-device", socket);
+    const result = await harness.client.callTool({ name: "list_devices", arguments: {} });
+    const [content] = result.content as Array<{ text: string }>;
+    const devices = JSON.parse(content.text).devices as Array<{ deviceId: string; deviceName: string }>;
+    assert.deepStrictEqual(devices.sort((left, right) => left.deviceId.localeCompare(right.deviceId)), [
+      { deviceId: "legacy-device", deviceName: "legacy-device" },
+      { deviceId: "second-device", deviceName: DEVICE_NAME },
+      { deviceId: DEVICE_ID, deviceName: DEVICE_NAME },
+    ]);
+  } finally {
+    await tearDownHarness(harness);
+  }
+});
+
+test("targeting requires deviceId rather than a display name or legacy argument", async () => {
+  await withRegisteredDevice(async (client) => {
+    for (const args of [{ deviceName: DEVICE_ID }, { deviceId: DEVICE_NAME }, { deviceId: "" }]) {
+      const result = await client.callTool({ name: "mouse_click", arguments: { ...args, x: 1, y: 2 } });
+      assert.equal(result.isError, true);
+    }
+    const result = await client.callTool({ name: "mouse_click", arguments: { deviceId: DEVICE_ID, x: 1, y: 2 } });
+    assert.notEqual(result.isError, true);
+    const [content] = result.content as Array<{ text: string }>;
+    assert.equal(JSON.parse(content.text).success, true);
+  });
+});
+
+test("dashboard MCP calls use deviceId while retaining readable labels", () => {
+  const widget = buildDashboardWidget([]);
+  assert.ok(widget.includes('{ deviceId:d.deviceId }'));
+  assert.ok(widget.includes('{deviceId:id,text:inp.value}'));
+  assert.ok(widget.includes('{deviceId:cid,x:'));
+  assert.ok(widget.includes('{ deviceId:dev }'));
+  assert.ok(widget.includes('showResult("Screenshot — "+d.deviceName'));
 });
 
 test("cmd relays defaults and surfaces nonzero exit codes as MCP errors", async () => {
   await withRegisteredDevice(async (client) => {
     for (const command of ["echo hello", "exit /b 7"]) {
-      const result = await client.callTool({ name: "cmd", arguments: { deviceName: DEVICE_ID, command } });
+      const result = await client.callTool({ name: "cmd", arguments: { deviceId: DEVICE_ID, command } });
       const [content] = result.content as Array<{ text: string }>;
       const parsed = JSON.parse(content.text);
       assert.equal(parsed.output, "hello\r\n");
@@ -168,7 +218,7 @@ test("cmd relays defaults and surfaces nonzero exit codes as MCP errors", async 
 test("cmd rejects multiline input and excessive timeout before relay", async () => {
   await withRegisteredDevice(async (client) => {
     for (const args of [{ command: "echo one\necho two" }, { command: "echo hello", timeoutMs: 20001 }]) {
-      const result = await client.callTool({ name: "cmd", arguments: { deviceName: DEVICE_ID, ...args } });
+      const result = await client.callTool({ name: "cmd", arguments: { deviceId: DEVICE_ID, ...args } });
       assert.equal(result.isError, true);
     }
   });
@@ -178,7 +228,7 @@ test("mouse_move relays through the fake device and back", async () => {
   await withRegisteredDevice(async (client) => {
     const result = await client.callTool({
       name: "mouse_move",
-      arguments: { deviceName: DEVICE_ID, x: 42, y: 84 },
+      arguments: { deviceId: DEVICE_ID, x: 42, y: 84 },
     });
     const [content] = result.content as Array<{ text: string }>;
     const parsed = JSON.parse(content.text);
@@ -193,7 +243,7 @@ test("screenshot relays a real-shaped PNG payload", async () => {
   await withRegisteredDevice(async (client) => {
     const result = await client.callTool({
       name: "screenshot",
-      arguments: { deviceName: DEVICE_ID },
+      arguments: { deviceId: DEVICE_ID },
     });
     const [image, meta] = result.content as Array<Record<string, unknown>>;
     assert.equal(image.type, "image");
@@ -209,7 +259,7 @@ test("get_window_list relays the fake device's window list", async () => {
   await withRegisteredDevice(async (client) => {
     const result = await client.callTool({
       name: "get_window_list",
-      arguments: { deviceName: DEVICE_ID },
+      arguments: { deviceId: DEVICE_ID },
     });
     const [content] = result.content as Array<{ text: string }>;
     const parsed = JSON.parse(content.text);
@@ -223,14 +273,14 @@ test("type_text and key_press succeed through the relay", async () => {
   await withRegisteredDevice(async (client) => {
     const typeResult = await client.callTool({
       name: "type_text",
-      arguments: { deviceName: DEVICE_ID, text: "hello" },
+      arguments: { deviceId: DEVICE_ID, text: "hello" },
     });
     const [typeContent] = typeResult.content as Array<{ text: string }>;
     assert.equal(JSON.parse(typeContent.text).success, true);
 
     const keyResult = await client.callTool({
       name: "key_press",
-      arguments: { deviceName: DEVICE_ID, keys: ["ctrl", "s"] },
+      arguments: { deviceId: DEVICE_ID, keys: ["ctrl", "s"] },
     });
     const [keyContent] = keyResult.content as Array<{ text: string }>;
     assert.equal(JSON.parse(keyContent.text).success, true);
@@ -242,7 +292,7 @@ test("a tool call naming an unregistered device surfaces a clear MCP error", asy
   try {
     const result = await harness.client.callTool({
       name: "mouse_move",
-      arguments: { deviceName: "unregistered-device", x: 1, y: 1 },
+      arguments: { deviceId: "unregistered-device", x: 1, y: 1 },
     });
     assert.equal(result.isError, true);
   } finally {

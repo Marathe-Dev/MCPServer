@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { registerAllTools } from "../tools/index.js";
 /**
  * Builds the one, universal MCP server instance. Every tool takes a
- * `deviceName` argument and resolves its own relay services per call — the
+ * `deviceId` argument and resolves its own relay services per call — the
  * server itself is not bound to any single device.
  */
 export function createServer(deviceRegistry) {

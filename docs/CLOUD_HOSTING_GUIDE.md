@@ -30,7 +30,7 @@ npm start
 You should see:
 
 ```
-[cloud-mcp-server] MCP endpoint: http://127.0.0.1:4000/mcp (use the "deviceName" argument on every tool)
+[cloud-mcp-server] MCP endpoint: http://127.0.0.1:4000/mcp (use the "deviceId" argument on device-targeted tools)
 [cloud-mcp-server] device link endpoint: ws://127.0.0.1:4000/device-link
 ```
 
@@ -92,7 +92,7 @@ https://your-app.onrender.com/mcp
 ```
 
 This is the one universal endpoint for all agents and all devices. After connecting, the
-agent should call `list_devices` first, then pass the selected `deviceName` on each desktop
+agent should call `list_devices` first, then pass the selected device's `deviceId` on each desktop
 tool call.
 
 **VS Code (`.vscode/mcp.json`) or similar host:**
@@ -159,7 +159,7 @@ node build/cli.js install
 2. Start `local-tool-service` on the desktop.
 3. Call `list_devices` from the agent and confirm the device appears.
 4. Call `screenshot`, `mouse_move`, `mouse_click`, `type_text`, `key_press`, or
-   `get_window_list` with `deviceName` set to that device.
+  `get_window_list` with `deviceId` set to that device's ID.
 
 If those calls work, the full path is working: agent → cloud MCP server → relay → local
 desktop.

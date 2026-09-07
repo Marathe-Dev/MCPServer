@@ -9,7 +9,7 @@ export function registerCmdTool(server: McpServer, deviceRegistry: DeviceRegistr
       description:
         "Run a CMD command through WinPTY on the Windows WPF tool service. Requires local CMD opt-in. Each call starts a fresh shell as the signed-in user. Output is terminal text, possibly including ANSI escapes. Do not use for interactive prompts or long-running servers.",
       inputSchema: z.object({
-        deviceName: z.string().describe("Target device's ID, from list_devices"),
+        deviceId: z.string().min(1).describe("Target deviceId from list_devices; not the readable deviceName"),
         command: z.string().min(1).max(8000).refine(
           (value) => value.trim().length > 0 && !/[\r\n\0]/.test(value),
           "Provide a non-empty single command line",
@@ -20,9 +20,9 @@ export function registerCmdTool(server: McpServer, deviceRegistry: DeviceRegistr
       }),
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
-    async ({ deviceName, ...args }) => {
+    async ({ deviceId, ...args }) => {
       const result = await deviceRegistry.sendRequest<{ success: boolean }>(
-        deviceName, "cmd.execute", args, args.timeoutMs + 20000,
+        deviceId, "cmd.execute", args, args.timeoutMs + 20000,
       );
       return {
         content: [{ type: "text", text: JSON.stringify(result) }],

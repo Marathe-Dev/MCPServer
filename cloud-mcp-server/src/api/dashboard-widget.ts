@@ -286,25 +286,25 @@ tr:last-child td{border-bottom:none}
     if(el.id === "refresh"){ refresh(); return; }
     if(el.id === "shotAll"){
       state.devices.filter(function(d){return d.status==="online";}).forEach(function(d){
-        invoke("screenshot", { deviceName:d.deviceId }).then(function(r){ showResult("Screenshot — "+d.deviceName, r); }).catch(function(err){ toast(err.message,"err"); });
+        invoke("screenshot", { deviceId:d.deviceId }).then(function(r){ showResult("Screenshot — "+d.deviceName, r); }).catch(function(err){ toast(err.message,"err"); });
       });
       return;
     }
     if(el.hasAttribute("data-type-send")){
       var id = el.getAttribute("data-type-send");
       var inp = document.querySelector('[data-type-input="'+id+'"]');
-      if(inp && inp.value){ invoke("type_text",{deviceName:id,text:inp.value},el).then(function(){toast("Text sent","ok"); inp.value="";}).catch(function(err){toast(err.message,"err");}); }
+      if(inp && inp.value){ invoke("type_text",{deviceId:id,text:inp.value},el).then(function(){toast("Text sent","ok"); inp.value="";}).catch(function(err){toast(err.message,"err");}); }
       return;
     }
     if(el.hasAttribute("data-click")){
       var cid = el.getAttribute("data-click");
       var xi = document.querySelector('[data-x="'+cid+'"]'), yi = document.querySelector('[data-y="'+cid+'"]');
-      invoke("mouse_click",{deviceName:cid,x:Number(xi&&xi.value)||0,y:Number(yi&&yi.value)||0,button:"left",clickType:"single"},el).then(function(){toast("Click sent","ok");}).catch(function(err){toast(err.message,"err");});
+      invoke("mouse_click",{deviceId:cid,x:Number(xi&&xi.value)||0,y:Number(yi&&yi.value)||0,button:"left",clickType:"single"},el).then(function(){toast("Click sent","ok");}).catch(function(err){toast(err.message,"err");});
       return;
     }
     if(el.hasAttribute("data-tool")){
       var tool = el.getAttribute("data-tool"), dev = el.getAttribute("data-device");
-      invoke(tool, { deviceName:dev }, el).then(function(r){ showResult(tool+" — "+dev, r); }).catch(function(err){ toast(err.message,"err"); });
+      invoke(tool, { deviceId:dev }, el).then(function(r){ showResult(tool+" — "+dev, r); }).catch(function(err){ toast(err.message,"err"); });
     }
   });
 

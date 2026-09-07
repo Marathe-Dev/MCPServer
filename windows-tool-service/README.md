@@ -128,7 +128,7 @@ Older TypeScript-based device agents still work for the original six tools; they
 
 ```json
 {
-  "deviceName": "ID returned by list_devices",
+  "deviceId": "deviceId returned by list_devices",
   "command": "ver & whoami & dir",
   "workingDirectory": "C:\\Users",
   "timeoutMs": 10000,

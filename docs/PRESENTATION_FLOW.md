@@ -50,7 +50,7 @@ flowchart LR
     Agent[Web Agent / Desktop Agent] -- "Streamable HTTP" --> CloudMCP[Cloud MCP Server\nSingle public /mcp endpoint]
 
     CloudMCP --> DeviceList[List devices\nselect target device]
-    CloudMCP --> Relay[Route tool call by deviceName]
+    CloudMCP --> Relay[Route tool call by deviceId]
 
     Relay -- "WebSocket" --> LocalSvc[local-tool-service\nRuns on the target desktop]
     LocalSvc --> LocalOS[Local OS automation\nmouse / keyboard / screenshot / windows]

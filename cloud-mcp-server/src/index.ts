@@ -6,7 +6,7 @@ const host = process.env.HOST ?? "0.0.0.0";
 const app = createApp();
 
 app.httpServer.listen(port, host, () => {
-  console.error(`[cloud-mcp-server] MCP endpoint: http://${host}:${port}/mcp (use the "deviceName" argument on every tool)`);
+  console.error(`[cloud-mcp-server] MCP endpoint: http://${host}:${port}/mcp (use the "deviceId" argument on device-targeted tools)`);
   console.error(`[cloud-mcp-server] device link endpoint: ws://${host}:${port}/device-link`);
 });
 

@@ -15,13 +15,13 @@ export function registerMouseMoveTool(
     {
       description: "Move mouse cursor to coordinates without clicking, on a specific device",
       inputSchema: z.object({
-        deviceName: z.string().describe("Target device's ID, from list_devices"),
+        deviceId: z.string().min(1).describe("Target deviceId from list_devices; not the readable deviceName"),
         x: z.number().int().describe("Target X coordinate in screen pixels"),
         y: z.number().int().describe("Target Y coordinate in screen pixels"),
       }),
     },
-    async ({ deviceName, x, y }) => {
-      const services = createServices(deviceName, deviceRegistry);
+    async ({ deviceId, x, y }) => {
+      const services = createServices(deviceId, deviceRegistry);
       const result = await services.mouseService.move({ x, y });
       return { content: [{ type: "text", text: JSON.stringify(result) }] };
     },

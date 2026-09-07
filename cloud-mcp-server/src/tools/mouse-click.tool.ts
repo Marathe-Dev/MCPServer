@@ -16,7 +16,7 @@ export function registerMouseClickTool(
     {
       description: "Move mouse to coordinates and click (left, right, or double) on a specific device",
       inputSchema: z.object({
-        deviceName: z.string().describe("Target device's ID, from list_devices"),
+        deviceId: z.string().min(1).describe("Target deviceId from list_devices; not the readable deviceName"),
         x: z.number().int().describe("Target X coordinate in screen pixels"),
         y: z.number().int().describe("Target Y coordinate in screen pixels"),
         button: z
@@ -29,8 +29,8 @@ export function registerMouseClickTool(
           .describe("Single or double click"),
       }),
     },
-    async ({ deviceName, x, y, button, clickType }) => {
-      const services = createServices(deviceName, deviceRegistry);
+    async ({ deviceId, x, y, button, clickType }) => {
+      const services = createServices(deviceId, deviceRegistry);
       const result = await services.mouseService.click({
         x,
         y,

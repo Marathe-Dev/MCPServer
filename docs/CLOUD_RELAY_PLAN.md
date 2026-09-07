@@ -2,7 +2,7 @@
 
 > **Superseded detail:** this plan originally routed by URL, one MCP endpoint per device
 > (`/mcp/<deviceId>`). That was replaced by a single universal `/mcp` endpoint where every
-> tool takes a `deviceName` argument instead — see
+> device-targeted tool takes a `deviceId` argument instead — see
 > [MULTI_DEVICE_FLOW.md](MULTI_DEVICE_FLOW.md) for the current design. Everything else below
 > (relay protocol, device registry, WebSocket transport) is unchanged.
 
@@ -162,7 +162,7 @@ process** running inside the user's own session:
 15. Manual E2E: run local-tool-service pointed at a locally-run cloud-mcp-server (same
     machine, two terminals/processes); connect an MCP test client (same pattern as the
     existing repo's `tests/tools/tools.test.ts`) to `http://localhost:<port>/mcp` (universal
-    endpoint, `deviceName` passed per tool call — see the superseded-detail note above);
+   endpoint, `deviceId` passed per tool call — see the superseded-detail note above);
     call all 6 tools; confirm round-trip results, including a real screenshot's base64 PNG
     surviving the relay hop intact (compare decoded width/height).
 16. Add automated relay-level tests to `cloud-mcp-server`: an in-process fake WebSocket

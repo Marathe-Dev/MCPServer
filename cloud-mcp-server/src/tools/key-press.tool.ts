@@ -15,15 +15,15 @@ export function registerKeyPressTool(
     {
       description: "Press key combinations (e.g. Ctrl+S, Alt+Tab) on a specific device",
       inputSchema: z.object({
-        deviceName: z.string().describe("Target device's ID, from list_devices"),
+        deviceId: z.string().min(1).describe("Target deviceId from list_devices; not the readable deviceName"),
         keys: z
           .array(z.string())
           .min(1)
           .describe('Keys to press together, e.g. ["ctrl", "s"]'),
       }),
     },
-    async ({ deviceName, keys }) => {
-      const services = createServices(deviceName, deviceRegistry);
+    async ({ deviceId, keys }) => {
+      const services = createServices(deviceId, deviceRegistry);
       const result = await services.keyboardService.keyPress({ keys });
       return { content: [{ type: "text", text: JSON.stringify(result) }] };
     },

@@ -15,9 +15,9 @@ a tool call travels end to end. Companion to [CLOUD_RELAY_PLAN.md](CLOUD_RELAY_P
 Two identifiers make the whole system work:
 
 - **`deviceId`** — chosen by each Local Tool Service (a random UUID by default). Every tool
-  call names its target device by passing this same value as the `deviceName` argument.
-  It's both the routing key (which desktop a call goes to) *and*, in v1's no-auth design,
-  the only access-control check — see the security note at the bottom.
+  call names its target device by passing this same value as the `deviceId` argument.
+  It is a routing key, not an authentication credential. The separate `deviceName`
+  is a readable display label and need not be unique.
 - **`requestId`** — a fresh UUID generated per tool call, used only to match a `tool_result`
   back to the `tool_call` that produced it (several calls can be in flight at once, from
   different agents, to different devices, all sharing the same process and the same MCP
@@ -25,9 +25,9 @@ Two identifiers make the whole system work:
 
 One agent connection is enough to control every paired device — there's no need to
 reconnect or switch endpoints to target a different desktop, an agent just names a
-different `deviceName` on its next tool call. A `list_devices` tool lets an agent discover
+different `deviceId` on its next tool call. A `list_devices` tool lets an agent discover
 which device IDs are currently connected before targeting one (e.g. "take a screenshot of
-`local-test-device`" → `screenshot({ deviceName: "local-test-device" })`).
+`local-test-device`" → `screenshot({ deviceId: "local-test-device" })`).
 
 ## Architecture
 
@@ -50,9 +50,9 @@ graph LR
         D2["Local Tool Service<br/>deviceId = laptop-2"]
     end
 
-    A1 -->|"POST /mcp<br/>deviceName: desk-1"| MCP
-    A3 -->|"POST /mcp<br/>deviceName: desk-1"| MCP
-    A2 -->|"POST /mcp<br/>deviceName: laptop-2"| MCP
+    A1 -->|"POST /mcp<br/>deviceId: desk-1"| MCP
+    A3 -->|"POST /mcp<br/>deviceId: desk-1"| MCP
+    A2 -->|"POST /mcp<br/>deviceId: laptop-2"| MCP
     MCP --> REG
     REG <--> LINK
     LINK <-->|"outbound WebSocket"| D1
@@ -90,7 +90,7 @@ simply overwritten.
 
 ## 2. One tool call, end to end
 
-Any agent can call any tool at any time, naming whichever device it wants in the `deviceName`
+Any agent can call any tool at any time, naming whichever device it wants in the `deviceId`
 argument; here's a `screenshot` call from Agent A targeting `desk-1`, over the one shared
 `/mcp` connection:
 
@@ -104,8 +104,8 @@ sequenceDiagram
     participant Link as /device-link (WS)
     participant Local as Local Tool Service (desk-1)
 
-    Agent->>MCP: tools/call "screenshot" {deviceName:"desk-1"}
-    MCP->>Tool: handler({deviceName:"desk-1"})
+    Agent->>MCP: tools/call "screenshot" {deviceId:"desk-1"}
+    MCP->>Tool: handler({deviceId:"desk-1"})
     Tool->>Relay: createServices("desk-1", registry).capturePrimaryDisplay()
     Relay->>Reg: sendRequest("desk-1", "screenshot.capturePrimaryDisplay")
     Reg->>Reg: new requestId, store {resolve, reject, timeout}
@@ -121,22 +121,22 @@ sequenceDiagram
 ```
 
 The cloud server never talks to the OS itself. Each tool file (`src/tools/*.tool.ts`) reads
-its own `deviceName` argument and builds a small, disposable set of `Relay*Service` objects
-for that one call via `createServices(deviceName, deviceRegistry)`; those just do the
+its own `deviceId` argument and builds a small, disposable set of `Relay*Service` objects
+for that one call via `createServices(deviceId, deviceRegistry)`; those just do the
 `sendRequest(...)` step above with a different `tool` name. Nothing about the tool's
 registration or the MCP server itself is bound to any device — the same global `McpServer`
 instance answers calls for every device.
 
 ## Multi-device routing in one picture
 
-Routing is resolved **per tool call**, from that call's own `deviceName` argument — not from
+Routing is resolved **per tool call**, from that call's own `deviceId` argument — not from
 the URL, and not from which agent is asking:
 
 ```mermaid
 graph TD
-    C1["tool call: deviceName = desk-1"] --> L{"Device Registry lookup"}
-    C2["tool call: deviceName = laptop-2"] --> L
-    C3["tool call: deviceName = unknown-id"] --> L
+    C1["tool call: deviceId = desk-1"] --> L{"Device Registry lookup"}
+    C2["tool call: deviceId = laptop-2"] --> L
+    C3["tool call: deviceId = unknown-id"] --> L
     L -->|"desk-1 → connected"| D1[desk-1's WebSocket]
     L -->|"laptop-2 → connected"| D2[laptop-2's WebSocket]
     L -->|"unknown-id → not found"| ERR["reject: 'Device not connected.<br/>Connected devices: desk-1, laptop-2.'<br/>→ surfaces as an MCP tool error"]
@@ -144,7 +144,7 @@ graph TD
 
 ## Multiple agents, one device
 
-Nothing stops two agents (or the same agent, twice) from naming the same `deviceName`
+Nothing stops two agents (or the same agent, twice) from naming the same `deviceId`
 concurrently. Each call gets its own `requestId`, so responses never cross-talk — but the
 *physical* mouse/keyboard/screen is a single shared resource, so two agents clicking at the
 same time will genuinely race on the real desktop, the same way two people sharing one mouse
@@ -153,10 +153,10 @@ would. That's an inherent limitation of controlling one real machine, not a prot
 ## Discovering devices: `list_devices`
 
 Before targeting a device, an agent can call `list_devices` (no arguments) to get the
-currently connected `deviceId`s:
+currently connected devices with IDs and readable names:
 
 ```json
-{ "success": true, "devices": ["desk-1", "laptop-2"], "timestamp": "..." }
+{ "success": true, "devices": [{ "deviceId": "desk-1", "deviceName": "Office PC" }, { "deviceId": "laptop-2", "deviceName": "Laptop" }], "timestamp": "..." }
 ```
 
 This is also what feeds the offline-device error message below — the cloud server always
@@ -167,7 +167,7 @@ knows the full connected list when a call fails.
 - **Device never registered / disconnected**: `sendRequest` finds no socket and rejects
   immediately with `Device "<id>" is not connected. Connected devices: ...` (or "No devices
   are currently connected.") — the agent sees a normal MCP tool error, no hang, and enough
-  information to retry with a valid `deviceName`.
+  information to retry with a valid `deviceId`.
 - **Device registered but unresponsive**: after 15s (default) with no matching `tool_result`,
   the pending request times out and rejects with a clear message naming the tool and device.
 - **Device reconnects with a new socket**: the old socket (if still open) is closed by the

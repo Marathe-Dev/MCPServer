@@ -7,11 +7,11 @@ export function registerTypeTextTool(server, deviceRegistry) {
     server.registerTool("type_text", {
         description: "Type text input via the keyboard on a specific device",
         inputSchema: z.object({
-            deviceName: z.string().describe("Target device's ID, from list_devices"),
+            deviceId: z.string().min(1).describe("Target deviceId from list_devices; not the readable deviceName"),
             text: z.string().describe("The text to type"),
         }),
-    }, async ({ deviceName, text }) => {
-        const services = createServices(deviceName, deviceRegistry);
+    }, async ({ deviceId, text }) => {
+        const services = createServices(deviceId, deviceRegistry);
         const result = await services.keyboardService.typeText({ text });
         return { content: [{ type: "text", text: JSON.stringify(result) }] };
     });
