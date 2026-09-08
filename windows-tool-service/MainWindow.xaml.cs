@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Input;
 
 namespace WindowsToolService
 {
@@ -24,9 +25,26 @@ namespace WindowsToolService
             this.config = config;
         }
 
+        private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs args)
+        {
+            if (args.ButtonState == MouseButtonState.Pressed) DragMove();
+        }
+
+        private void Minimize_Click(object sender, RoutedEventArgs args)
+        {
+            WindowState = WindowState.Minimized;
+        }
+
+        private void Cancel_Click(object sender, RoutedEventArgs args)
+        {
+            Close();
+        }
+
         private async void OnLoaded(object sender, RoutedEventArgs args)
         {
-            if (initialized || DesignerProperties.GetIsInDesignMode(this)) return;
+            if (initialized || DesignerProperties.GetIsInDesignMode(this)) 
+                return;
+
             try
             {
                 config = config ?? AgentConfig.Load();
@@ -36,8 +54,11 @@ namespace WindowsToolService
                 enableCmd.IsChecked = config.EnableCmd;
                 autoConnect.IsChecked = config.AutoConnectOnStartup;
                 initialized = true;
+
                 ShowForeground();
-                if (config.AutoConnectOnStartup) await ConnectAsync();
+
+                if (config.AutoConnectOnStartup) 
+                    await ConnectAsync();
             }
             catch (Exception error)
             {
@@ -46,28 +67,42 @@ namespace WindowsToolService
             }
         }
 
-        private async void OnConnectClick(object sender, RoutedEventArgs args) { await ConnectAsync(); }
+        private async void OnConnectClick(object sender, RoutedEventArgs args) 
+        { 
+            await ConnectAsync(); 
+        }
 
-        private async void OnDisconnectClick(object sender, RoutedEventArgs args) { await StopAsync(); }
+        private async void OnDisconnectClick(object sender, RoutedEventArgs args) 
+        { 
+            await StopAsync(); 
+        }
 
         private void OnEnableCmdChecked(object sender, RoutedEventArgs args)
         {
-            if (!initialized) return;
+            if (!initialized) 
+                return;
+
             if (MessageBox.Show(this, "CMD grants the connected relay permission to run arbitrary commands as your Windows user. Use only a trusted, access-controlled relay. Allow CMD?", "Remote command access", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 enableCmd.IsChecked = false;
         }
 
         internal void ShowForeground()
         {
-            if (closing) return;
+            if (closing) 
+                return;
+
             Show();
-            if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+
+            if (WindowState == WindowState.Minimized) 
+                WindowState = WindowState.Normal;
+
             Activate();
         }
 
         private Task ConnectAsync()
         {
             if (!initialized || closing || running != null) return Task.FromResult(0);
+
             try
             {
                 config.CloudUrl = cloud.Text.Trim();

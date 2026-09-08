@@ -1,51 +1,658 @@
 <Window x:Class="WindowsToolService.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Windows MCP Tool Service" Width="760" Height="570"
-        MinWidth="520" MinHeight="460" WindowStartupLocation="CenterScreen"
-        FontFamily="Segoe UI" FontSize="14" Background="WhiteSmoke"
-        Loaded="OnLoaded" Closing="OnClosing">
-    <Grid Margin="24">
+        Title="Windows MCP Tool Service"
+        Width="440" Height="600"
+        MinWidth="380" MinHeight="480"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        ResizeMode="CanMinimize"
+        FontFamily="Segoe UI"
+        WindowStartupLocation="CenterScreen"
+        MouseLeftButtonDown="Window_MouseLeftButtonDown"
+        Loaded="OnLoaded"
+        Closing="OnClosing">
+
+    <Window.Style>
+        <Style TargetType="{x:Type Window}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Window}">
+                        <Border Background="{DynamicResource ContentBackground}"
+                                BorderBrush="{DynamicResource PopupWindowCenterGridBorder}"
+                                BorderThickness="1"
+                                CornerRadius="7">
+                            <ContentPresenter />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Style>
+
+    <Window.Resources>
+
+        <SolidColorBrush x:Key="ContentBackground" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="PopupWindowCenterGridBorder" Color="#9BA2A854" />
+        <SolidColorBrush x:Key="PopupWindowTitleForeground" Color="#313131" />
+        <SolidColorBrush x:Key="PopupWindowTopGridBorder" Color="#CDCFD1" />
+        <SolidColorBrush x:Key="PopupWindowBottomGridBackground" Color="#F3F3F3" />
+        <SolidColorBrush x:Key="PopupWindowNameBorder" Color="#8B929B" />
+
+        <SolidColorBrush x:Key="ButtonBackground" Color="#0071BC" />
+        <SolidColorBrush x:Key="ButtonHover" Color="#0D89DC" />
+        <SolidColorBrush x:Key="ButtonPressed" Color="#07598F" />
+        <SolidColorBrush x:Key="CancelBackground" Color="White" />
+        <SolidColorBrush x:Key="CancelButtonHover" Color="#E6F2FF" />
+        <SolidColorBrush x:Key="CancelButtonPressed" Color="#C8ECFF" />
+
+        <SolidColorBrush x:Key="TextBlockColor2" Color="#171717" />
+        <SolidColorBrush x:Key="TextBlockColor3" Color="#646464" />
+
+        <!-- Section header text style -->
+        <Style x:Key="SectionHeader" TargetType="{x:Type TextBlock}">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontFamily" Value="Segoe UI" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource PopupWindowTitleForeground}" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+
+        <!-- Label style for field rows -->
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="#333333" />
+        </Style>
+
+        <!-- Solid single-tone divider -->
+        <Style x:Key="Divider" TargetType="Separator">
+            <Setter Property="Margin" Value="0,12,0,12" />
+            <Setter Property="Height" Value="1" />
+            <Setter Property="Background" Value="{StaticResource PopupWindowTopGridBorder}" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="UseLayoutRounding" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Separator}">
+                        <Border Height="{TemplateBinding Height}"
+                                Background="{TemplateBinding Background}"
+                                SnapsToDevicePixels="True" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Action button base -->
+        <Style x:Key="ButtonStyle" TargetType="{x:Type Button}">
+            <Setter Property="Height" Value="30" />
+            <Setter Property="MinWidth" Value="100" />
+            <Setter Property="FontFamily" Value="Segoe UI" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="13" />
+        </Style>
+
+        <!-- Primary (Connect) button -->
+        <Style x:Key="OKButtonStyle" TargetType="{x:Type Button}" BasedOn="{StaticResource ButtonStyle}">
+            <Setter Property="Background" Value="{StaticResource ButtonBackground}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border Background="{TemplateBinding Background}" Padding="10,2" CornerRadius="4">
+                            <TextBlock Text="{TemplateBinding Content}"
+                                       TextTrimming="CharacterEllipsis"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource ButtonHover}" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="{StaticResource ButtonPressed}" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="#CCCCCC" />
+                    <Setter Property="Foreground" Value="#888888" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Secondary (Disconnect) button -->
+        <Style x:Key="CancelButtonStyle" TargetType="{x:Type Button}" BasedOn="{StaticResource ButtonStyle}">
+            <Setter Property="Foreground" Value="{StaticResource ButtonBackground}" />
+            <Setter Property="Background" Value="{StaticResource CancelBackground}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border BorderBrush="{StaticResource ButtonBackground}"
+                                BorderThickness="1"
+                                Padding="10,2"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="4">
+                            <TextBlock Text="{TemplateBinding Content}"
+                                       TextTrimming="CharacterEllipsis"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource CancelButtonHover}" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="{StaticResource CancelButtonPressed}" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Foreground" Value="#AAAAAA" />
+                    <Setter Property="Background" Value="#F3F3F3" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Check-box -->
+        <Style TargetType="Border" x:Key="BorderStyle">
+            <Setter Property="BorderBrush" Value="#1B3F70" />
+            <Setter Property="Background" Value="White" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="3" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="BorderBrush" Value="#3278D7" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="#E0DEDE" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="CheckBoxStyle" TargetType="CheckBox">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="20" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border x:Name="CheckBoxBorder" Grid.Column="0"
+                                    Style="{StaticResource BorderStyle}"
+                                    Height="16" Width="16">
+                                <Path x:Name="CheckMark"
+                                      Data="M 0 4.5 L 3 7.5 L 7.5 0"
+                                      Stroke="#0071BC"
+                                      StrokeThickness="2"
+                                      Visibility="Collapsed"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock x:Name="textContent" Grid.Column="1"
+                                       FontWeight="Normal"
+                                       Text="{TemplateBinding Content}"
+                                       TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center"
+                                       Margin="6,0,0,0" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="CheckMark" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="textContent" Property="Foreground" Value="#0D89DC" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="textContent" Property="Foreground" Value="#9A9A9A" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Single-line input (TextBox) -->
+        <Style x:Key="PopupWindowNameStyle" TargetType="{x:Type TextBox}">
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="CaretBrush" Value="{DynamicResource TextBlockColor2}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextBlockColor2}" />
+            <Setter Property="Background" Value="White" />
+            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource PopupWindowNameBorder}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type TextBox}">
+                        <Border x:Name="border"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                CornerRadius="5"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Background="{TemplateBinding Background}"
+                                SnapsToDevicePixels="True">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Focusable="false"
+                                          HorizontalScrollBarVisibility="Hidden"
+                                          VerticalScrollBarVisibility="Hidden" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="#3278D7" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="#3278D7" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border" Property="Background" Value="#E8E6E6" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Single-line input (PasswordBox) -->
+        <Style x:Key="PopupWindowPasswordStyle" TargetType="{x:Type PasswordBox}">
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="CaretBrush" Value="{DynamicResource TextBlockColor2}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextBlockColor2}" />
+            <Setter Property="Background" Value="White" />
+            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource PopupWindowNameBorder}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type PasswordBox}">
+                        <Border x:Name="border"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                CornerRadius="5"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Background="{TemplateBinding Background}"
+                                SnapsToDevicePixels="True">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Focusable="false"
+                                          HorizontalScrollBarVisibility="Hidden"
+                                          VerticalScrollBarVisibility="Hidden" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="#3278D7" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="#3278D7" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border" Property="Background" Value="#E8E6E6" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Activity log -->
+        <Style x:Key="LogBoxStyle" TargetType="{x:Type TextBox}">
+            <Setter Property="FontFamily" Value="Consolas" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="IsReadOnly" Value="True" />
+            <Setter Property="AcceptsReturn" Value="True" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="Foreground" Value="{DynamicResource TextBlockColor2}" />
+            <Setter Property="Background" Value="#FBFBFB" />
+            <Setter Property="BorderBrush" Value="{DynamicResource PopupWindowNameBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="6" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type TextBox}">
+                        <Border BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="5">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Close / minimize icons -->
+        <SolidColorBrush x:Key="PopupWindowCloseButtonBackground" Color="Transparent" />
+        <SolidColorBrush x:Key="PopupWindowCloseButtonHover" Color="#DC3531" />
+
+        <DrawingImage x:Key="CloseIconDI">
+            <DrawingImage.Drawing>
+                <DrawingGroup ClipGeometry="M0,0 V9.71 H9.71 V0 H0 Z">
+                    <GeometryDrawing>
+                        <GeometryDrawing.Pen>
+                            <Pen Brush="#FF5F6368" Thickness="1" />
+                        </GeometryDrawing.Pen>
+                        <GeometryDrawing.Geometry>
+                            <LineGeometry StartPoint="0.35,0.35" EndPoint="9.35,9.35" />
+                        </GeometryDrawing.Geometry>
+                    </GeometryDrawing>
+                    <GeometryDrawing>
+                        <GeometryDrawing.Pen>
+                            <Pen Brush="#FF5F6368" Thickness="1" />
+                        </GeometryDrawing.Pen>
+                        <GeometryDrawing.Geometry>
+                            <LineGeometry StartPoint="9.35,0.35" EndPoint="0.35,9.35" />
+                        </GeometryDrawing.Geometry>
+                    </GeometryDrawing>
+                </DrawingGroup>
+            </DrawingImage.Drawing>
+        </DrawingImage>
+
+        <DrawingImage x:Key="CloseIconHoverDI">
+            <DrawingImage.Drawing>
+                <DrawingGroup ClipGeometry="M0,0 V16 H16 V0 H0 Z">
+                    <GeometryDrawing>
+                        <GeometryDrawing.Pen>
+                            <Pen Brush="#FFFFFFFF" Thickness="1" />
+                        </GeometryDrawing.Pen>
+                        <GeometryDrawing.Geometry>
+                            <LineGeometry StartPoint="3.5,3.5" EndPoint="12.5,12.5" />
+                        </GeometryDrawing.Geometry>
+                    </GeometryDrawing>
+                    <GeometryDrawing>
+                        <GeometryDrawing.Pen>
+                            <Pen Brush="#FFFFFFFF" Thickness="1" />
+                        </GeometryDrawing.Pen>
+                        <GeometryDrawing.Geometry>
+                            <LineGeometry StartPoint="12.5,3.5" EndPoint="3.5,12.5" />
+                        </GeometryDrawing.Geometry>
+                    </GeometryDrawing>
+                </DrawingGroup>
+            </DrawingImage.Drawing>
+        </DrawingImage>
+
+        <DrawingImage x:Key="RPCProduct_logoDrawingImage">
+            <DrawingImage.Drawing>
+                <DrawingGroup ClipGeometry="M0,0 V43 H43 V0 H0 Z">
+                    <DrawingGroup Opacity="1" Transform="1,0,0,1,-30,-27">
+                        <DrawingGroup Transform="1,0,0,1,30,27">
+                            <GeometryDrawing>
+                                <GeometryDrawing.Brush>
+                                    <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1" MappingMode="RelativeToBoundingBox" SpreadMethod="Pad" Opacity="1">
+                                        <GradientStop Color="#FF43A7FF" Offset="0" />
+                                        <GradientStop Color="#FF1851A7" Offset="1" />
+                                    </LinearGradientBrush>
+                                </GeometryDrawing.Brush>
+                                <GeometryDrawing.Geometry>
+                                    <EllipseGeometry RadiusX="21.5" RadiusY="21.5" Center="21.5,21.5" />
+                                </GeometryDrawing.Geometry>
+                            </GeometryDrawing>
+                        </DrawingGroup>
+                        <DrawingGroup Transform="1,0,0,1,32,28">
+                            <GeometryDrawing>
+                                <GeometryDrawing.Brush>
+                                    <DrawingBrush Viewbox="0,0,1,1" Stretch="Fill" Opacity="0.53">
+                                        <DrawingBrush.Drawing>
+                                            <GeometryDrawing>
+                                                <GeometryDrawing.Brush>
+                                                    <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.548,0.575" MappingMode="RelativeToBoundingBox" SpreadMethod="Pad">
+                                                        <GradientStop Color="#FFFFFFFF" Offset="0" />
+                                                        <GradientStop Color="#00FFFFFF" Offset="1" />
+                                                    </LinearGradientBrush>
+                                                </GeometryDrawing.Brush>
+                                                <GeometryDrawing.Geometry>
+                                                    <RectangleGeometry Rect="0,0,1,1" />
+                                                </GeometryDrawing.Geometry>
+                                            </GeometryDrawing>
+                                        </DrawingBrush.Drawing>
+                                    </DrawingBrush>
+                                </GeometryDrawing.Brush>
+                                <GeometryDrawing.Geometry>
+                                    <EllipseGeometry RadiusX="19.5" RadiusY="19.5" Center="19.5,19.5" />
+                                </GeometryDrawing.Geometry>
+                            </GeometryDrawing>
+                        </DrawingGroup>
+                        <DrawingGroup Transform="1,0,0,1,-1225.188,-175.352">
+                            <GeometryDrawing Brush="#FFFFFFFF" Geometry="F1 M43,43z M0,0z M1287.795,234.3A8.918,8.918,0,0,0,1285.953,229.628A4.886,4.886,0,0,0,1287.921,225.321C1288.047,222.032,1286.149,220.134,1282.356,220.134L1276.411,220.134A1.729,1.729,0,0,0,1274.641,221.905L1274.641,236.578 1276.158,236.578A1.934,1.934,0,0,0,1278.182,234.553L1278.182,230.51 1281.789,230.51C1282.556,230.599 1284.065,231.193 1284.253,234.477 1284.253,234.47 1284.253,234.466 1284.253,234.461 1284.265,234.71 1284.528,237.098 1288.683,236.556L1288.698,236.53C1288.698,236.53,1288.174,236.326,1287.795,234.3z M1281.722,227.6L1278.308,227.6 1278.308,222.92 1281.976,222.92C1283.621,222.92 1284.506,223.679 1284.506,225.32 1284.505,226.841 1283.62,227.6 1281.722,227.6z" />
+                        </DrawingGroup>
+                        <DrawingGroup Opacity="1" Transform="1,0,0,1,39.491,33.887">
+                            <DrawingGroup Transform="1,0,0,1,-1245.176,-189.557">
+                                <GeometryDrawing Geometry="F1 M43,43z M0,0z M1251.464,201.76A6.233,6.233,0,0,1,1261.577,196.88A6.52,6.52,0,1,0,1253.366,206.241A6.215,6.215,0,0,1,1251.464,201.76z">
+                                    <GeometryDrawing.Brush>
+                                        <LinearGradientBrush StartPoint="0.5,0.5" EndPoint="0.5,1.468" MappingMode="RelativeToBoundingBox" SpreadMethod="Pad" Opacity="1">
+                                            <GradientStop Color="#FF3FC6FF" Offset="0" />
+                                            <GradientStop Color="#FF148CD1" Offset="0.639" />
+                                            <GradientStop Color="#FF0071BC" Offset="1" />
+                                        </LinearGradientBrush>
+                                    </GeometryDrawing.Brush>
+                                </GeometryDrawing>
+                            </DrawingGroup>
+                            <DrawingGroup Opacity="1" Transform="1,0,0,1,-1230.23,-175">
+                                <GeometryDrawing Geometry="F1 M43,43z M0,0z M1249.578,184.5A9.675,9.675,0,0,0,1230.23,184.673A9.517,9.517,0,0,0,1238.949,194.142L1238.956,194.142A8.932,8.932,0,0,1,1232.333,185.482A8.529,8.529,0,0,1,1240.862,176.953A8.938,8.938,0,0,1,1249.578,184.49z">
+                                    <GeometryDrawing.Brush>
+                                        <LinearGradientBrush StartPoint="0.5,0.5" EndPoint="0.5,1.5" MappingMode="RelativeToBoundingBox" SpreadMethod="Pad" Opacity="1">
+                                            <GradientStop Color="#FF3FC6FF" Offset="0" />
+                                            <GradientStop Color="#FF148CD1" Offset="0.639" />
+                                            <GradientStop Color="#FF0071BC" Offset="1" />
+                                        </LinearGradientBrush>
+                                    </GeometryDrawing.Brush>
+                                </GeometryDrawing>
+                            </DrawingGroup>
+                        </DrawingGroup>
+                        <DrawingGroup Opacity="1" Transform="1,0,0,1,39.491,33.887">
+                            <DrawingGroup Transform="1,0,0,1,-1245.176,-189.557">
+                                <GeometryDrawing Geometry="F1 M43,43z M0,0z M1251.464,201.76A6.233,6.233,0,0,1,1261.577,196.88A6.52,6.52,0,1,0,1253.366,206.241A6.215,6.215,0,0,1,1251.464,201.76z">
+                                    <GeometryDrawing.Brush>
+                                        <LinearGradientBrush StartPoint="0.5,0.5" EndPoint="0.5,1.468" MappingMode="RelativeToBoundingBox"  Opacity="1">
+                                            <GradientStop Color="#FFFFFFFF" Offset="0" />
+                                            <GradientStop Color="#FFFFFFFF" Offset="0.7" />
+                                            <GradientStop Color="#FF0071BC" Offset="1" />
+                                        </LinearGradientBrush>
+                                    </GeometryDrawing.Brush>
+                                </GeometryDrawing>
+                            </DrawingGroup>
+                            <DrawingGroup Opacity="1" Transform="1,0,0,1,-1230.23,-175">
+                                <GeometryDrawing Geometry="F1 M43,43z M0,0z M1249.578,184.5A9.675,9.675,0,0,0,1230.23,184.673A9.517,9.517,0,0,0,1238.949,194.142L1238.956,194.142A8.932,8.932,0,0,1,1232.333,185.482A8.529,8.529,0,0,1,1240.862,176.953A8.938,8.938,0,0,1,1249.578,184.49z">
+                                    <GeometryDrawing.Brush>
+                                        <LinearGradientBrush StartPoint="0.5,0.5" EndPoint="0.5,1.468" MappingMode="RelativeToBoundingBox"  Opacity="1">
+                                            <GradientStop Color="#FFFFFFFF" Offset="0" />
+                                            <GradientStop Color="#FFFFFFFF" Offset="0.7" />
+                                            <GradientStop Color="#FF0071BC" Offset="1" />
+                                        </LinearGradientBrush>
+                                    </GeometryDrawing.Brush>
+                                </GeometryDrawing>
+                            </DrawingGroup>
+                        </DrawingGroup>
+                    </DrawingGroup>
+                </DrawingGroup>
+            </DrawingImage.Drawing>
+        </DrawingImage>
+
+        <Style x:Key="PopupWindowCloseButtonStyle" TargetType="{x:Type Button}">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="{StaticResource PopupWindowCloseButtonBackground}" />
+            <Setter Property="ToolTip" Value="Close" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="4">
+                            <Image x:Name="PopupWindowCloseImg"
+                                   Source="{DynamicResource CloseIconDI}"
+                                   Height="13" Width="13"
+                                   VerticalAlignment="Center"
+                                   HorizontalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="PopupWindowCloseImg" Property="Source" Value="{DynamicResource CloseIconHoverDI}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource PopupWindowCloseButtonHover}" />
+                    <Setter Property="Cursor" Value="Hand" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="PopupWindowMinButtonStyle" TargetType="{x:Type Button}">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="ToolTip" Value="Minimize" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="4">
+                            <TextBlock Text="&#x2013;" FontSize="15" Foreground="#5F6368"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-4,0,0" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E5EEF9" />
+                    <Setter Property="Cursor" Value="Hand" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+    </Window.Resources>
+
+    <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="45" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="58" />
         </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="125" />
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-        <TextBlock Grid.ColumnSpan="2" Text="Windows MCP Tool Service"
-                   FontSize="24" FontWeight="SemiBold" Margin="0,0,0,20" />
-        <Label Grid.Row="1" Content="Cloud URL" Target="{Binding ElementName=cloud}"
-               Padding="0" VerticalAlignment="Center" Margin="0,0,0,12" />
-        <TextBox x:Name="cloud" Grid.Row="1" Grid.Column="1" Padding="6" Margin="0,0,0,12" />
-        <Label Grid.Row="2" Content="Device ID" Target="{Binding ElementName=deviceId}"
-               Padding="0" VerticalAlignment="Center" Margin="0,0,0,12" />
-        <PasswordBox x:Name="deviceId" Grid.Row="2" Grid.Column="1" Padding="6" Margin="0,0,0,12" />
-        <Label Grid.Row="3" Content="Device name" Target="{Binding ElementName=name}"
-               Padding="0" VerticalAlignment="Center" Margin="0,0,0,12" />
-        <TextBox x:Name="name" Grid.Row="3" Grid.Column="1" Padding="6" Margin="0,0,0,12" />
-        <CheckBox x:Name="enableCmd" Grid.Row="4" Grid.ColumnSpan="2"
-                  Content="Allow remote CMD execution" Checked="OnEnableCmdChecked" />
-        <CheckBox x:Name="autoConnect" Grid.Row="5" Grid.ColumnSpan="2" Content="Connect on startup" />
-        <StackPanel Grid.Row="6" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,16,0,12">
-            <Button x:Name="connect" Content="Connect" MinWidth="100" Padding="12,6"
-                    Margin="0,0,12,0" Click="OnConnectClick" />
-            <Button x:Name="disconnect" Content="Disconnect" MinWidth="100" Padding="12,6"
-                    IsEnabled="False" Click="OnDisconnectClick" />
-        </StackPanel>
-        <TextBlock x:Name="state" Grid.Row="7" Grid.ColumnSpan="2" Text="Stopped"
-                   FontWeight="SemiBold" TextWrapping="Wrap" />
-        <TextBlock Grid.Row="8" Grid.ColumnSpan="2" Text="Activity" Margin="0,16,0,6" />
-        <TextBox x:Name="activity" Grid.Row="9" Grid.ColumnSpan="2" IsReadOnly="True"
-                 AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" />
+
+        <!-- Header -->
+        <Grid Grid.Row="0" Margin="15,0,10,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="40" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Image Grid.Column="0"
+                   Source="{DynamicResource RPCProduct_logoDrawingImage}"
+                   Width="28" Height="28"
+                   HorizontalAlignment="Left" VerticalAlignment="Center" />
+
+            <TextBlock Grid.Column="1"
+                       Text="Windows MCP Tool Service"
+                       Style="{StaticResource SectionHeader}"
+                       FontSize="16" Margin="2,0,0,0"
+                       TextTrimming="CharacterEllipsis" />
+
+            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Width="26" Height="24" Style="{StaticResource PopupWindowMinButtonStyle}" Click="Minimize_Click" />
+                <Button Width="26" Height="24" Margin="4,0,0,0" Style="{StaticResource PopupWindowCloseButtonStyle}" Click="Cancel_Click" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Content -->
+        <Border Grid.Row="1"
+                BorderBrush="{StaticResource PopupWindowTopGridBorder}"
+                BorderThickness="0,1,0,0">
+            <Grid Margin="18,15,18,10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="100" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Text="Connection" Style="{StaticResource SectionHeader}" />
+
+                <TextBlock Grid.Row="1" Text="Cloud URL" Style="{StaticResource FieldLabel}" Margin="0,0,0,10" />
+                <TextBox x:Name="cloud" Grid.Row="1" Grid.Column="1" Margin="0,0,0,10"
+                         Style="{StaticResource PopupWindowNameStyle}" />
+
+                <TextBlock Grid.Row="2" Text="Device ID" Style="{StaticResource FieldLabel}" Margin="0,0,0,10" />
+                <PasswordBox x:Name="deviceId" Grid.Row="2" Grid.Column="1" Margin="0,0,0,10"
+                             Style="{StaticResource PopupWindowPasswordStyle}" />
+
+                <TextBlock Grid.Row="3" Text="Device name" Style="{StaticResource FieldLabel}" Margin="0,0,0,10" />
+                <TextBox x:Name="name" Grid.Row="3" Grid.Column="1" Margin="0,0,0,10"
+                         Style="{StaticResource PopupWindowNameStyle}" />
+
+                <Separator Grid.Row="4" Grid.ColumnSpan="2" Style="{StaticResource Divider}" />
+
+                <TextBlock Grid.Row="5" Grid.ColumnSpan="2" Text="Options" Style="{StaticResource SectionHeader}" />
+
+                <CheckBox x:Name="enableCmd" Grid.Row="6" Grid.ColumnSpan="2"
+                          Content="Allow remote CMD execution"
+                          Style="{StaticResource CheckBoxStyle}"
+                          Margin="0,2,0,6" Checked="OnEnableCmdChecked" />
+                <CheckBox x:Name="autoConnect" Grid.Row="7" Grid.ColumnSpan="2"
+                          Content="Connect on startup"
+                          Style="{StaticResource CheckBoxStyle}"
+                          Margin="0,2,0,0" />
+
+                <Separator Grid.Row="8" Grid.ColumnSpan="2" Style="{StaticResource Divider}" />
+
+                <Grid Grid.Row="9" Grid.ColumnSpan="2" Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Activity" Style="{StaticResource SectionHeader}" Margin="0" />
+                    <TextBlock x:Name="state" Grid.Column="1" Text="Stopped"
+                               FontWeight="SemiBold" Foreground="{StaticResource ButtonBackground}"
+                               HorizontalAlignment="Right" VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" />
+                </Grid>
+
+                <TextBox x:Name="activity" Grid.Row="10" Grid.ColumnSpan="2"
+                         Style="{StaticResource LogBoxStyle}" />
+            </Grid>
+        </Border>
+
+        <!-- Action bar -->
+        <Border Grid.Row="2"
+                BorderThickness="0,1,0,0"
+                CornerRadius="0,0,7,7"
+                BorderBrush="{StaticResource PopupWindowCenterGridBorder}"
+                Background="{StaticResource PopupWindowBottomGridBackground}">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,15,0">
+                <Button x:Name="connect" Content="Connect"
+                        IsDefault="True"
+                        Style="{StaticResource OKButtonStyle}"
+                        Margin="0,0,10,0" Click="OnConnectClick" />
+                <Button x:Name="disconnect" Content="Disconnect"
+                        IsEnabled="False"
+                        Style="{StaticResource CancelButtonStyle}"
+                        Click="OnDisconnectClick" />
+            </StackPanel>
+        </Border>
     </Grid>
 </Window>
