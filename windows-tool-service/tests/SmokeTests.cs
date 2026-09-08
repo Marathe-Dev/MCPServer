@@ -95,6 +95,14 @@ namespace WindowsToolService
                     Assert((bool)routed["success"] && (int)routed["size"] == 4, "DesktopTools routes file.read");
                 }
                 finally { try { File.Delete(routedFile); } catch { } }
+
+                // Logger writes next to the exe and trims when it grows past 1 MB.
+                var logFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MCPToolService.Log");
+                Log.Write("smoke test log line");
+                Assert(File.Exists(logFile) && File.ReadAllText(logFile).Contains("smoke test log line"), "logger writes to exe directory");
+                File.WriteAllBytes(logFile, new byte[(1024 * 1024) + 4096]);
+                Log.Write("after overflow");
+                Assert(new FileInfo(logFile).Length <= 1024 * 1024, "logger trims when oversized");
                 if (args.Contains("--native"))
                 {
                     NativeAsync().GetAwaiter().GetResult();

@@ -18,6 +18,7 @@ namespace WindowsToolService
             base.OnStartup(args);
             if (!Environment.UserInteractive || Process.GetCurrentProcess().SessionId == 0)
             {
+                Log.Write("Startup rejected: not an interactive user session.");
                 Shutdown(1);
                 return;
             }
@@ -43,6 +44,7 @@ namespace WindowsToolService
 
                 if (!ownsMutex)
                 {
+                    Log.Write("Another agent instance is already running; bringing it forward.");
                     showEvent.Set();
                     Shutdown();
                     return;
@@ -58,9 +60,11 @@ namespace WindowsToolService
                 }, null, Timeout.Infinite, false);
 
                 window.Show();
+                Log.Write("Agent started.");
             }
             catch (Exception error)
             {
+                Log.Write("Startup failed", error);
                 MessageBox.Show(error.Message, "Windows MCP Tool Service", MessageBoxButton.OK, MessageBoxImage.Error);
                 Shutdown(1);
             }
@@ -80,6 +84,7 @@ namespace WindowsToolService
             if (instanceMutex != null) 
                 instanceMutex.Dispose();
 
+            Log.Write("Agent exited.");
             base.OnExit(args);
         }
 

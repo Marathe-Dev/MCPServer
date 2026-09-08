@@ -63,11 +63,13 @@ namespace WindowsToolService
                 autoConnect.IsChecked = _config.AutoConnectOnStartup;
                 _initialized = true;
 
+                Log.Write("Settings loaded for device \"" + _config.DeviceName + "\".");
                 ShowForeground();
                 if (_config.AutoConnectOnStartup) await ConnectAsync();
             }
             catch (Exception error)
             {
+                Log.Write("Failed to load settings", error);
                 MessageBox.Show(this, error.Message, "Cannot load settings", MessageBoxButton.OK, MessageBoxImage.Error);
                 Close();
             }
@@ -87,7 +89,14 @@ namespace WindowsToolService
             const string message = "CMD lets the connected relay run arbitrary commands as your Windows user. " +
                                    "Use only a trusted, access-controlled relay. Allow CMD?";
             if (MessageBox.Show(this, message, "Remote command access", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            {
                 enableCmd.IsChecked = false;
+                Log.Write("Remote CMD access declined.");
+            }
+            else
+            {
+                Log.Write("Remote CMD access enabled.");
+            }
         }
 
         // ── Connect / disconnect ──────────────────────────────────────────────
@@ -113,11 +122,13 @@ namespace WindowsToolService
                 var tools = new DesktopTools(_config);
                 var relay = new RelayClient(_config, tools.CallAsync, SetStatus);
 
+                Log.Write("Connecting to " + _config.CloudUrl + " as device \"" + _config.DeviceId + "\".");
                 SetControls(stopped: false);
                 _running = Task.Run(() => relay.RunAsync(_cancellation.Token));
             }
             catch (Exception error)
             {
+                Log.Write("Connect failed", error);
                 MessageBox.Show(this, error.Message, "Cannot connect", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             return Task.FromResult(0);
@@ -170,6 +181,7 @@ namespace WindowsToolService
         /// <summary>Shows the latest status and appends a timestamped line to the bounded log.</summary>
         private void SetStatus(string message)
         {
+            Log.Write(message);
             if (Dispatcher.HasShutdownStarted) return;
 
             Dispatcher.BeginInvoke(new Action(delegate
@@ -196,6 +208,7 @@ namespace WindowsToolService
             if (_closing) return;
             _closing = true;
 
+            Log.Write("Window closing; disconnecting.");
             SetControls(stopped: false);
             await StopAsync();
             _allowClose = true;

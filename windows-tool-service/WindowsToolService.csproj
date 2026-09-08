@@ -80,6 +80,7 @@
     <Compile Include="AgentConfig.cs" />
     <Compile Include="DesktopTools.cs" />
     <Compile Include="FileTools.cs" />
+    <Compile Include="Log.cs" />
     <Compile Include="RelayClient.cs" />
     <Compile Include="WinPtyCommand.cs" />
     <Compile Include="MainWindow.xaml.cs">
