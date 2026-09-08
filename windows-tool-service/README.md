@@ -20,8 +20,9 @@ This is a normal user-session EXE. No Windows service or installation scripts ar
 | [App.xaml](App.xaml), [App.xaml.cs](App.xaml.cs) | WPF startup, session guard, single instance per session, cleanup |
 | [MainWindow.xaml](MainWindow.xaml), [MainWindow.xaml.cs](MainWindow.xaml.cs) | Designer-editable UI and connection event handlers (closing disconnects and exits) |
 | `RelayClient.cs` | WebSocket connection to the cloud server: register, ping/pong, reconnect backoff |
-| `DesktopTools.cs` | Win32 mouse/keyboard input, screen capture, window enumeration |
+| `DesktopTools.cs` | Single tool dispatcher — one `CallAsync` switch routes mouse/keyboard/screenshot/window input plus CMD and file reads |
 | `WinPtyCommand.cs` | Runs one CMD command per call via WinPTY, with timeout and output limits |
+| `FileTools.cs` | Reads a file (absolute path) as base64, capped at 10 MB |
 
 ## Requirements
 
@@ -114,8 +115,9 @@ owns launch/relaunch policy. Previously installed services are not automatically
 | `screenshot` | `screenshot.capturePrimaryDisplay` | — (returns PNG `base64Data`, width, height) |
 | `get_window_list` | `window.listWindows` | — (visible titled windows, geometry, focus) |
 | `cmd` | `cmd.execute` | `command`, optional `workingDirectory`, `timeoutMs`, `maxOutputChars` |
+| `get_file` | `file.read` | `path` (absolute); returns `base64Data`, `name`, `size` — files over 10 MB are rejected |
 
-Results carry `success`, `backend` (`win32` or `winpty`), and an ISO `timestamp`. Key/mouse-button names match the existing TypeScript agent. The cloud server needs its own small rebuild to pick up the new `cmd` tool:
+Every relay action is dispatched by one `DesktopTools.CallAsync` switch. Results carry `success`, `backend` (`win32` or `winpty`), and an ISO `timestamp`. Key/mouse-button names match the existing TypeScript agent. The cloud server needs its own small rebuild to pick up the `cmd` and `get_file` tools:
 
 ```powershell
 npm --prefix cloud-mcp-server run build

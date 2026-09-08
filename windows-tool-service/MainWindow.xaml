@@ -10,8 +10,8 @@
         FontFamily="Segoe UI"
         WindowStartupLocation="CenterScreen"
         MouseLeftButtonDown="Window_MouseLeftButtonDown"
-        Loaded="OnLoaded"
-        Closing="OnClosing">
+        Loaded="Window_Loaded"
+        Closing="Window_Closing">
 
     <Window.Style>
         <Style TargetType="{x:Type Window}">
@@ -612,7 +612,7 @@
                 <CheckBox x:Name="enableCmd" Grid.Row="6" Grid.ColumnSpan="2"
                           Content="Allow remote CMD execution"
                           Style="{StaticResource CheckBoxStyle}"
-                          Margin="0,2,0,6" Checked="OnEnableCmdChecked" />
+                          Margin="0,2,0,6" Checked="EnableCmd_Checked" />
                 <CheckBox x:Name="autoConnect" Grid.Row="7" Grid.ColumnSpan="2"
                           Content="Connect on startup"
                           Style="{StaticResource CheckBoxStyle}"
@@ -647,11 +647,11 @@
                 <Button x:Name="connect" Content="Connect"
                         IsDefault="True"
                         Style="{StaticResource OKButtonStyle}"
-                        Margin="0,0,10,0" Click="OnConnectClick" />
+                        Margin="0,0,10,0" Click="Connect_Click" />
                 <Button x:Name="disconnect" Content="Disconnect"
                         IsEnabled="False"
                         Style="{StaticResource CancelButtonStyle}"
-                        Click="OnDisconnectClick" />
+                        Click="Disconnect_Click" />
             </StackPanel>
         </Border>
     </Grid>

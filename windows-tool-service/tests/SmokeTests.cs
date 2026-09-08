@@ -82,6 +82,19 @@ namespace WindowsToolService
                     Reject(() => FileTools.Read(new Dictionary<string, object> { { "path", oversized } }), "10 MB file size rejection");
                 }
                 finally { try { File.Delete(oversized); } catch { } }
+
+                // DesktopTools is the single switch: it must route cmd + file.read too.
+                var router = new DesktopTools(new AgentConfig { CloudUrl = "ws://127.0.0.1:4000", DeviceId = "router", DeviceName = "router", EnableCmd = false });
+                try { router.CallAsync("cmd.execute", new Dictionary<string, object> { { "command", "echo hi" } }, CancellationToken.None).GetAwaiter().GetResult(); throw new Exception("Expected CMD rejection."); }
+                catch (InvalidOperationException) { Assert(true, "DesktopTools blocks CMD when disabled"); }
+                var routedFile = Path.Combine(Path.GetTempPath(), "windows-tool-service-routed-" + Guid.NewGuid().ToString("N") + ".bin");
+                try
+                {
+                    File.WriteAllBytes(routedFile, new byte[] { 0x4d, 0x43, 0x50, 0x00 });
+                    var routed = (Dictionary<string, object>)router.CallAsync("file.read", new Dictionary<string, object> { { "path", routedFile } }, CancellationToken.None).GetAwaiter().GetResult();
+                    Assert((bool)routed["success"] && (int)routed["size"] == 4, "DesktopTools routes file.read");
+                }
+                finally { try { File.Delete(routedFile); } catch { } }
                 if (args.Contains("--native"))
                 {
                     NativeAsync().GetAwaiter().GetResult();
@@ -114,10 +127,10 @@ namespace WindowsToolService
 
         private static async Task NativeAsync()
         {
-            var desktop = new DesktopTools();
-            var windows = (Dictionary<string, object>)desktop.Call("window.listWindows", new Dictionary<string, object>());
+            var desktop = new DesktopTools(new AgentConfig { CloudUrl = "ws://127.0.0.1:4000", DeviceId = "native", DeviceName = "native", EnableCmd = true });
+            var windows = (Dictionary<string, object>)(await desktop.CallAsync("window.listWindows", new Dictionary<string, object>(), CancellationToken.None));
             Assert((bool)windows["success"], "native window enumeration");
-            var screenshot = (Dictionary<string, object>)desktop.Call("screenshot.capturePrimaryDisplay", new Dictionary<string, object>());
+            var screenshot = (Dictionary<string, object>)(await desktop.CallAsync("screenshot.capturePrimaryDisplay", new Dictionary<string, object>(), CancellationToken.None));
             var image = Convert.FromBase64String((string)screenshot["base64Data"]);
             Assert(image.Length > 8 && image[0] == 137 && image[1] == 80 && (int)screenshot["width"] > 0, "native PNG screenshot");
             var command = new WinPtyCommand();
