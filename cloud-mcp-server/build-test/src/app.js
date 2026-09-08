@@ -1,21 +1,15 @@
 import { createServer as createHttpServer } from "node:http";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { createMcpHandler, } from "@modelcontextprotocol/server";
 import { toNodeHandler } from "@modelcontextprotocol/node";
-import express, { json } from "express";
+import express from "express";
 import { createServer } from "./server/create-server.js";
 import { DeviceRegistry } from "./relay/device-registry.js";
 import { createDeviceLinkServer } from "./relay/device-link-server.js";
-import { createDashboardRouter } from "./api/dashboard-router.js";
 export const MCP_PATH = /^\/mcp\/?$/;
-/** `dashboard/` lives next to `src`/`build`, one level above this compiled file. */
-const DASHBOARD_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "dashboard");
 /**
- * Builds the full app (universal MCP HTTP routing + REST dashboard API +
- * static dashboard UI + `/device-link` WS upgrade) without starting to
- * listen — kept separate from `index.ts` so tests can bind an ephemeral
- * port.
+ * Builds the app (universal MCP HTTP routing + `/device-link` WS upgrade)
+ * without starting to listen — kept separate from `index.ts` so tests can
+ * bind an ephemeral port.
  */
 export function createApp() {
     const deviceRegistry = new DeviceRegistry();
@@ -30,10 +24,6 @@ export function createApp() {
     expressApp.get("/", (_req, res) => {
         res.json({ status: "ok", service: "cloud-mcp-server" });
     });
-    // `json()` is scoped to /api only so it never consumes the MCP endpoint's
-    // own request stream (Streamable HTTP reads the raw body itself).
-    expressApp.use("/api", json(), createDashboardRouter(deviceRegistry));
-    expressApp.use("/dashboard", express.static(DASHBOARD_DIR));
     expressApp.all(MCP_PATH, (req, res) => {
         Promise.resolve(mcpNodeHandler(req, res)).catch((error) => {
             console.error(`[cloud-mcp-server] mcp handler error: ${String(error)}`);

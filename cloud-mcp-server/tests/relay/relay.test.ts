@@ -6,7 +6,6 @@ import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/cli
 import WebSocket from "ws";
 
 import { createApp, type CloudApp } from "../../src/app.js";
-import { buildDashboardWidget } from "../../src/api/dashboard-widget.js";
 import type { RelayMessage, RelayRequestMessage } from "../../src/relay/relay-protocol.js";
 
 const DEVICE_ID = "test-device-1";
@@ -132,13 +131,12 @@ async function withRegisteredDevice(run: (client: Client) => Promise<void>): Pro
   }
 }
 
-test("discovers all ten MCP tools through the relay", async () => {
+test("discovers all MCP tools through the relay", async () => {
   await withRegisteredDevice(async (client) => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepStrictEqual(names, [
       "cmd",
-      "get_dashboard_data",
       "get_file",
       "get_window_list",
       "key_press",
@@ -146,7 +144,6 @@ test("discovers all ten MCP tools through the relay", async () => {
       "mouse_click",
       "mouse_move",
       "screenshot",
-      "show_dashboard",
       "type_text",
     ]);
     const targeted = new Set(["cmd", "get_file", "get_window_list", "key_press", "mouse_click", "mouse_move", "screenshot", "type_text"]);
@@ -199,15 +196,6 @@ test("targeting requires deviceId rather than a display name or legacy argument"
     const [content] = result.content as Array<{ text: string }>;
     assert.equal(JSON.parse(content.text).success, true);
   });
-});
-
-test("dashboard MCP calls use deviceId while retaining readable labels", () => {
-  const widget = buildDashboardWidget([]);
-  assert.ok(widget.includes('{ deviceId:d.deviceId }'));
-  assert.ok(widget.includes('{deviceId:id,text:inp.value}'));
-  assert.ok(widget.includes('{deviceId:cid,x:'));
-  assert.ok(widget.includes('{ deviceId:dev }'));
-  assert.ok(widget.includes('showResult("Screenshot — "+d.deviceName'));
 });
 
 test("cmd relays defaults and surfaces nonzero exit codes as MCP errors", async () => {

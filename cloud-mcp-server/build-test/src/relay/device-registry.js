@@ -4,7 +4,7 @@ const DEFAULT_TIMEOUT_MS = 15000;
  * Tracks connected Local Tool Service WebSocket connections keyed by
  * deviceId, and correlates outgoing tool_call requests with the matching
  * tool_result response. Devices are kept (marked "offline") after
- * disconnect rather than deleted, so the dashboard can show history for
+ * disconnect rather than deleted, so `list_devices` can show history for
  * the lifetime of this process.
  */
 export class DeviceRegistry {
@@ -51,14 +51,11 @@ export class DeviceRegistry {
             .map(([deviceId]) => deviceId)
             .sort((left, right) => left.localeCompare(right));
     }
-    /** Full metadata for every device seen this process lifetime (including offline), for the dashboard. */
+    /** Full metadata for every device seen this process lifetime (including offline), for list_devices. */
     listDevices() {
         return [...this.devices.values()]
             .map((entry) => entry.info)
             .sort((left, right) => left.deviceName.localeCompare(right.deviceName));
-    }
-    getDevice(deviceId) {
-        return this.devices.get(deviceId)?.info;
     }
     /** Resolves/rejects the pending request matching a tool_result's requestId. */
     handleResult(message) {

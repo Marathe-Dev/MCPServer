@@ -47,6 +47,7 @@ namespace WindowsToolService
         }
 
         private async void OnConnectClick(object sender, RoutedEventArgs args) { await ConnectAsync(); }
+
         private async void OnDisconnectClick(object sender, RoutedEventArgs args) { await StopAsync(); }
 
         private void OnEnableCmdChecked(object sender, RoutedEventArgs args)
