@@ -62,6 +62,26 @@ namespace WindowsToolService
                 Assert(startup.AutoConnectOnStartup, "startup preference round trip");
                 new RelayClient(config, (tool, arguments, token) => Task.FromResult<object>(null), Console.WriteLine);
                 Assert(System.Net.ServicePointManager.SecurityProtocol == System.Net.SecurityProtocolType.Tls12, "relay enables TLS 1.2");
+                var fileArgs = new Dictionary<string, object> { { "path", "relative\\path.txt" } };
+                Reject(() => FileTools.Read(fileArgs), "relative file path rejection");
+                var missing = new Dictionary<string, object> { { "path", @"C:\Windows\this-file-does-not-exist.smoketest" } };
+                try { FileTools.Read(missing); throw new Exception("Expected file rejection."); }
+                catch (FileNotFoundException) { Assert(true, "missing file rejection"); }
+                var tempFile = Path.Combine(Path.GetTempPath(), "windows-tool-service-file-tools-" + Guid.NewGuid().ToString("N") + ".bin");
+                try
+                {
+                    File.WriteAllBytes(tempFile, new byte[] { 0x4d, 0x43, 0x50, 0x00 });
+                    var read = (Dictionary<string, object>)FileTools.Read(new Dictionary<string, object> { { "path", tempFile } });
+                    Assert((bool)read["success"] && (int)read["size"] == 4 && (string)read["base64Data"] == "TUNQAA==", "FileTools reads a small file");
+                }
+                finally { try { File.Delete(tempFile); } catch { } }
+                var oversized = Path.Combine(Path.GetTempPath(), "windows-tool-service-oversize-" + Guid.NewGuid().ToString("N") + ".bin");
+                try
+                {
+                    using (var stream = new FileStream(oversized, FileMode.CreateNew, FileAccess.Write)) { stream.SetLength(FileTools.MaxFileBytes + 1); }
+                    Reject(() => FileTools.Read(new Dictionary<string, object> { { "path", oversized } }), "10 MB file size rejection");
+                }
+                finally { try { File.Delete(oversized); } catch { } }
                 if (args.Contains("--native"))
                 {
                     NativeAsync().GetAwaiter().GetResult();

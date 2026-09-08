@@ -86,6 +86,7 @@ namespace WindowsToolService
                         if (!config.EnableCmd) throw new InvalidOperationException("CMD is disabled. Enable remote CMD locally in the WPF agent.");
                         return await command.ExecuteAsync(args, token).ConfigureAwait(false);
                     }
+                    if (tool == "file.read") return FileTools.Read(args);
                     return desktop.Call(tool, args);
                 }, SetStatus);
                 SetControls(false);

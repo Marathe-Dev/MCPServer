@@ -49,6 +49,13 @@ function fakeToolResult(message) {
                 backend: FAKE_BACKEND,
                 timestamp,
             });
+        case "file.read": {
+            const { path } = message.args;
+            if (path === "C:/too-big") {
+                return ok({ success: true, path, name: "too-big", size: 20 * 1024 * 1024, base64Data: "", backend: FAKE_BACKEND, timestamp });
+            }
+            return ok({ success: true, path, name: "hello.txt", size: 5, base64Data: Buffer.from("hello").toString("base64"), backend: FAKE_BACKEND, timestamp });
+        }
         default:
             return {
                 type: "tool_result",
@@ -106,6 +113,7 @@ test("discovers all ten MCP tools through the relay", async () => {
         assert.deepStrictEqual(names, [
             "cmd",
             "get_dashboard_data",
+            "get_file",
             "get_window_list",
             "key_press",
             "list_devices",
@@ -115,7 +123,7 @@ test("discovers all ten MCP tools through the relay", async () => {
             "show_dashboard",
             "type_text",
         ]);
-        const targeted = new Set(["cmd", "get_window_list", "key_press", "mouse_click", "mouse_move", "screenshot", "type_text"]);
+        const targeted = new Set(["cmd", "get_file", "get_window_list", "key_press", "mouse_click", "mouse_move", "screenshot", "type_text"]);
         for (const tool of tools.filter((tool) => targeted.has(tool.name))) {
             assert.ok(tool.inputSchema.required?.includes("deviceId"), tool.name);
             assert.ok(!Object.hasOwn(tool.inputSchema.properties ?? {}, "deviceName"), tool.name);
@@ -190,6 +198,18 @@ test("cmd rejects multiline input and excessive timeout before relay", async () 
             const result = await client.callTool({ name: "cmd", arguments: { deviceId: DEVICE_ID, ...args } });
             assert.equal(result.isError, true);
         }
+    });
+});
+test("get_file relays a small file and rejects oversized results", async () => {
+    await withRegisteredDevice(async (client) => {
+        const ok = await client.callTool({ name: "get_file", arguments: { deviceId: DEVICE_ID, path: "C:/hello.txt" } });
+        const [okContent] = ok.content;
+        const okPayload = JSON.parse(okContent.text);
+        assert.equal(okPayload.success, true);
+        assert.equal(Buffer.from(okPayload.base64Data, "base64").toString("utf-8"), "hello");
+        assert.notEqual(ok.isError, true);
+        const big = await client.callTool({ name: "get_file", arguments: { deviceId: DEVICE_ID, path: "C:/too-big" } });
+        assert.equal(big.isError, true);
     });
 });
 test("mouse_move relays through the fake device and back", async () => {

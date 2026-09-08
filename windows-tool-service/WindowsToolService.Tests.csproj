@@ -30,6 +30,7 @@
     <Reference Include="PresentationFramework" />
     <Compile Include="AgentConfig.cs" />
     <Compile Include="DesktopTools.cs" />
+    <Compile Include="FileTools.cs" />
     <Compile Include="RelayClient.cs" />
     <Compile Include="WinPtyCommand.cs" />
     <Page Include="MainWindow.xaml"><Generator>MSBuild:Compile</Generator><SubType>Designer</SubType></Page>
