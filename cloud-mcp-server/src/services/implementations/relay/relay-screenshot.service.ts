@@ -9,11 +9,11 @@ export class RelayScreenshotService implements IScreenshotService {
     private readonly registry: DeviceRegistry,
   ) {}
 
-  capturePrimaryDisplay(): Promise<ScreenshotResult> {
+  capture(args: Record<string, unknown>): Promise<ScreenshotResult> {
     return this.registry.sendRequest(
       this.deviceId,
       "screenshot.capturePrimaryDisplay",
-      {},
+      args,
     );
   }
 }

@@ -1,10 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { DeviceRegistry } from "../relay/device-registry.js";
 import { registerScreenshotTool } from "./screenshot.tool.js";
-import { registerMouseMoveTool } from "./mouse-move.tool.js";
-import { registerMouseClickTool } from "./mouse-click.tool.js";
-import { registerTypeTextTool } from "./type-text.tool.js";
-import { registerKeyPressTool } from "./key-press.tool.js";
+import { registerMouseTool } from "./mouse.tool.js";
+import { registerKeyboardTool } from "./keyboard.tool.js";
 import { registerGetWindowListTool } from "./get-window-list.tool.js";
 import { registerListDevicesTool } from "./list-devices.tool.js";
 import { registerCmdTool } from "./cmd.tool.js";
@@ -17,10 +15,8 @@ export function registerAllTools(
 ): void {
   registerListDevicesTool(server, deviceRegistry);
   registerScreenshotTool(server, deviceRegistry);
-  registerMouseMoveTool(server, deviceRegistry);
-  registerMouseClickTool(server, deviceRegistry);
-  registerTypeTextTool(server, deviceRegistry);
-  registerKeyPressTool(server, deviceRegistry);
+  registerMouseTool(server, deviceRegistry);
+  registerKeyboardTool(server, deviceRegistry);
   registerGetWindowListTool(server, deviceRegistry);
   registerCmdTool(server, deviceRegistry);
   registerGetFileTool(server, deviceRegistry);

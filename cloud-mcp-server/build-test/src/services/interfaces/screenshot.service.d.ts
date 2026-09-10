@@ -4,5 +4,5 @@ import type { ScreenshotResult } from "../../models/screenshot.models.js";
  * interface, never on a concrete OS API or transport.
  */
 export interface IScreenshotService {
-    capturePrimaryDisplay(): Promise<ScreenshotResult>;
+    capture(args: Record<string, unknown>): Promise<ScreenshotResult>;
 }

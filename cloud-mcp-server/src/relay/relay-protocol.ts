@@ -7,6 +7,8 @@
 export type RelayToolName =
   | "mouse.move"
   | "mouse.click"
+  | "mouse.scroll"
+  | "mouse.drag"
   | "keyboard.typeText"
   | "keyboard.keyPress"
   | "screenshot.capturePrimaryDisplay"

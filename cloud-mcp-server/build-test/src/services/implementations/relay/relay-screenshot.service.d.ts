@@ -6,5 +6,5 @@ export declare class RelayScreenshotService implements IScreenshotService {
     private readonly deviceId;
     private readonly registry;
     constructor(deviceId: string, registry: DeviceRegistry);
-    capturePrimaryDisplay(): Promise<ScreenshotResult>;
+    capture(args: Record<string, unknown>): Promise<ScreenshotResult>;
 }

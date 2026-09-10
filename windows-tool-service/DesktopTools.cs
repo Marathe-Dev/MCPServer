@@ -2,9 +2,12 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -49,9 +52,11 @@ namespace WindowsToolService
                 // Desktop input / capture — needs an unlocked, interactive desktop.
                 case "mouse.move":  RequireInteractiveDesktop(); return Move(args, click: false);
                 case "mouse.click": RequireInteractiveDesktop(); return Move(args, click: true);
+                case "mouse.scroll": RequireInteractiveDesktop(); return Scroll(args);
+                case "mouse.drag": RequireInteractiveDesktop(); return Drag(args);
                 case "keyboard.typeText": RequireInteractiveDesktop(); return TypeText(args);
                 case "keyboard.keyPress": RequireInteractiveDesktop(); return Press(args);
-                case "screenshot.capturePrimaryDisplay": RequireInteractiveDesktop(); return Capture();
+                case "screenshot.capturePrimaryDisplay": RequireInteractiveDesktop(); return Capture(args);
                 case "window.listWindows": RequireInteractiveDesktop(); return Windows();
 
                 default:
@@ -107,6 +112,53 @@ namespace WindowsToolService
             var result = Result();
             result["x"] = x;
             result["y"] = y;
+            return result;
+        }
+
+        /// <summary>Scrolls the wheel by whole notches (optionally after moving to a point).</summary>
+        private static object Scroll(IDictionary<string, object> args)
+        {
+            var bounds = SystemInformation.VirtualScreen;
+            if (args.ContainsKey("x") && args.ContainsKey("y"))
+            {
+                var px = Arguments.Integer(args, "x", bounds.Left, bounds.Right - 1);
+                var py = Arguments.Integer(args, "y", bounds.Top, bounds.Bottom - 1);
+                if (!SetCursorPos(px, py)) throw new Win32Exception();
+            }
+
+            var amount = Arguments.Integer(args, "amount", -100, 100);
+            var axis = Arguments.Choice(args, "axis", "vertical", "vertical", "horizontal");
+            var flags = axis == "horizontal" ? 0x1000u : 0x0800u; // MOUSEEVENTF_HWHEEL : MOUSEEVENTF_WHEEL
+            Send(new[] { MouseInput(flags, unchecked((uint)(amount * 120))) });
+
+            var result = Result();
+            result["amount"] = amount;
+            result["axis"] = axis;
+            return result;
+        }
+
+        /// <summary>Holds a button at a start point, moves to an end point, and releases (a drag).</summary>
+        private static object Drag(IDictionary<string, object> args)
+        {
+            var bounds = SystemInformation.VirtualScreen;
+            var x = Arguments.Integer(args, "x", bounds.Left, bounds.Right - 1);
+            var y = Arguments.Integer(args, "y", bounds.Top, bounds.Bottom - 1);
+            var toX = Arguments.Integer(args, "toX", bounds.Left, bounds.Right - 1);
+            var toY = Arguments.Integer(args, "toY", bounds.Top, bounds.Bottom - 1);
+            var button = Arguments.Choice(args, "button", "left", "left", "right");
+            var down = button == "right" ? 0x0008u : 0x0002u;
+
+            if (!SetCursorPos(x, y)) throw new Win32Exception();
+            Send(new[] { MouseInput(down) });
+            if (!SetCursorPos(toX, toY)) throw new Win32Exception();
+            Send(new[] { MouseInput(0x0001) }); // MOUSEEVENTF_MOVE so the target registers the drag
+            Send(new[] { MouseInput(down * 2) });
+
+            var result = Result();
+            result["x"] = x;
+            result["y"] = y;
+            result["toX"] = toX;
+            result["toY"] = toY;
             return result;
         }
 
@@ -193,50 +245,183 @@ namespace WindowsToolService
             return (key >= 33 && key <= 46) || key == 91 || key == 93 || key == 144 || key == 163 || key == 165 ? 1u : 0u;
         }
 
-        /// <summary>Captures the primary display as a base64 PNG.</summary>
-        private static object Capture()
-        {
-            var bounds = Screen.PrimaryScreen.Bounds;
-            using (var image = new Bitmap(bounds.Width, bounds.Height, PixelFormat.Format32bppArgb))
-            using (var graphics = Graphics.FromImage(image))
-            using (var stream = new MemoryStream())
-            {
-                graphics.CopyFromScreen(bounds.Location, Point.Empty, bounds.Size, CopyPixelOperation.SourceCopy);
-                image.Save(stream, ImageFormat.Png);
+        private const long AutoPngMaxPixels = 1000000;
 
-                var result = Result();
-                result["format"] = "png";
-                result["base64Data"] = Convert.ToBase64String(stream.ToArray());
-                result["width"] = bounds.Width;
-                result["height"] = bounds.Height;
-                return result;
+        /// <summary>Captures a target region (primary/virtual/display/window) as PNG or JPEG with coordinate metadata.</summary>
+        private static object Capture(IDictionary<string, object> args)
+        {
+            var target = Arguments.Choice(args, "target", "primary", "primary", "virtual", "display", "window");
+            Rectangle source;
+            switch (target)
+            {
+                case "virtual":
+                    source = SystemInformation.VirtualScreen;
+                    break;
+                case "display":
+                    var screens = Screen.AllScreens;
+                    source = screens[Arguments.Integer(args, "displayIndex", 0, screens.Length - 1, 0)].Bounds;
+                    break;
+                case "window":
+                    source = WindowRect(Arguments.Text(args, "windowTitle", 512));
+                    break;
+                default:
+                    source = Screen.PrimaryScreen.Bounds;
+                    break;
+            }
+            if (source.Width <= 0 || source.Height <= 0) throw new InvalidOperationException("Capture region is empty.");
+
+            var format = Arguments.Choice(args, "format", "auto", "auto", "png", "jpeg");
+            var quality = Arguments.Integer(args, "quality", 1, 100, 80);
+            var maxWidth = args.ContainsKey("maxWidth") ? Arguments.Integer(args, "maxWidth", 16, 10000) : 0;
+
+            using (var full = new Bitmap(source.Width, source.Height, PixelFormat.Format24bppRgb))
+            {
+                using (var graphics = Graphics.FromImage(full))
+                    graphics.CopyFromScreen(source.Location, Point.Empty, source.Size, CopyPixelOperation.SourceCopy);
+
+                var scale = 1.0;
+                var encoded = full;
+                Bitmap scaled = null;
+                try
+                {
+                    if (maxWidth > 0 && source.Width > maxWidth)
+                    {
+                        scale = (double)maxWidth / source.Width;
+                        var width = maxWidth;
+                        var height = Math.Max(1, (int)Math.Round(source.Height * scale));
+                        scaled = new Bitmap(width, height, PixelFormat.Format24bppRgb);
+                        using (var g = Graphics.FromImage(scaled))
+                        {
+                            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                            g.DrawImage(full, 0, 0, width, height);
+                        }
+                        encoded = scaled;
+                    }
+
+                    // Auto keeps small/text frames as lossless PNG and switches large frames to JPEG to cut size.
+                    var jpeg = format == "jpeg" || (format == "auto" && (long)encoded.Width * encoded.Height > AutoPngMaxPixels);
+                    byte[] bytes;
+                    using (var stream = new MemoryStream())
+                    {
+                        if (jpeg) SaveJpeg(encoded, stream, quality);
+                        else encoded.Save(stream, ImageFormat.Png);
+                        bytes = stream.ToArray();
+                    }
+
+                    var result = Result();
+                    result["format"] = jpeg ? "jpeg" : "png";
+                    result["mimeType"] = jpeg ? "image/jpeg" : "image/png";
+                    result["base64Data"] = Convert.ToBase64String(bytes);
+                    result["width"] = encoded.Width;
+                    result["height"] = encoded.Height;
+                    result["originalWidth"] = source.Width;
+                    result["originalHeight"] = source.Height;
+                    result["scale"] = scale;
+                    result["originX"] = source.X;
+                    result["originY"] = source.Y;
+                    result["displays"] = Displays();
+                    var virtualScreen = SystemInformation.VirtualScreen;
+                    result["virtualBounds"] = new { x = virtualScreen.X, y = virtualScreen.Y, width = virtualScreen.Width, height = virtualScreen.Height };
+                    var cursor = Cursor.Position;
+                    result["cursor"] = new { x = cursor.X, y = cursor.Y };
+                    return result;
+                }
+                finally { if (scaled != null) scaled.Dispose(); }
             }
         }
 
-        /// <summary>Lists every visible, titled top-level window with its bounds and focus.</summary>
+        /// <summary>Metadata for every display so the agent can map screenshot pixels to input coordinates.</summary>
+        private static List<object> Displays()
+        {
+            var displays = new List<object>();
+            var screens = Screen.AllScreens;
+            for (var i = 0; i < screens.Length; i++)
+            {
+                var b = screens[i].Bounds;
+                displays.Add(new { index = i, x = b.X, y = b.Y, width = b.Width, height = b.Height, isPrimary = screens[i].Primary });
+            }
+            return displays;
+        }
+
+        /// <summary>Encodes a bitmap as JPEG at the given quality using the built-in GDI+ encoder.</summary>
+        private static void SaveJpeg(Bitmap image, Stream stream, int quality)
+        {
+            var codec = ImageCodecInfo.GetImageEncoders().First(c => c.FormatID == ImageFormat.Jpeg.Guid);
+            using (var parameters = new EncoderParameters(1))
+            {
+                parameters.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, (long)quality);
+                image.Save(stream, codec, parameters);
+            }
+        }
+
+        /// <summary>Finds the on-screen rectangle of the best-matching visible window by title (prefers focused).</summary>
+        private static Rectangle WindowRect(string title)
+        {
+            var match = IntPtr.Zero;
+            var foreground = GetForegroundWindow();
+            var wanted = title.ToLowerInvariant();
+
+            EnumWindow callback = delegate(IntPtr handle, IntPtr parameter)
+            {
+                if (!IsWindowVisible(handle) || GetWindowTextLength(handle) == 0) return true;
+                var text = new StringBuilder(GetWindowTextLength(handle) + 1);
+                GetWindowText(handle, text, text.Capacity);
+                if (text.ToString().ToLowerInvariant().Contains(wanted))
+                {
+                    if (handle == foreground) { match = handle; return false; }
+                    if (match == IntPtr.Zero) match = handle;
+                }
+                return true;
+            };
+            EnumWindows(callback, IntPtr.Zero);
+
+            if (match == IntPtr.Zero) throw new ArgumentException("No visible window title contains: " + title);
+            Rect rect;
+            if (!GetWindowRect(match, out rect)) throw new Win32Exception();
+            return Rectangle.FromLTRB(rect.Left, rect.Top, rect.Right, rect.Bottom);
+        }
+
+        /// <summary>Lists visible, titled top-level windows with process, state and monitor info.</summary>
         private static object Windows()
         {
             var windows = new List<object>();
             var foreground = GetForegroundWindow();
+            var screens = Screen.AllScreens;
+            var names = new Dictionary<int, string>();
 
             EnumWindow callback = delegate(IntPtr handle, IntPtr parameter)
             {
                 if (!IsWindowVisible(handle)) return true;
-
-                var title = new StringBuilder(GetWindowTextLength(handle) + 1);
-                GetWindowText(handle, title, title.Capacity);
+                if ((ExStyle(handle) & 0x00000080) != 0) return true; // skip WS_EX_TOOLWINDOW
 
                 Rect bounds;
-                if (title.Length > 0 && GetWindowRect(handle, out bounds))
-                    windows.Add(new
-                    {
-                        title = title.ToString(),
-                        x = bounds.Left,
-                        y = bounds.Top,
-                        width = bounds.Right - bounds.Left,
-                        height = bounds.Bottom - bounds.Top,
-                        isFocused = handle == foreground
-                    });
+                if (!GetWindowRect(handle, out bounds)) return true;
+                var width = bounds.Right - bounds.Left;
+                var height = bounds.Bottom - bounds.Top;
+                if (width <= 0 || height <= 0) return true;
+
+                var length = GetWindowTextLength(handle);
+                if (length == 0) return true;
+                var title = new StringBuilder(length + 1);
+                GetWindowText(handle, title, title.Capacity);
+                if (title.Length == 0) return true;
+
+                uint pid;
+                GetWindowThreadProcessId(handle, out pid);
+                windows.Add(new
+                {
+                    title = title.ToString(),
+                    x = bounds.Left,
+                    y = bounds.Top,
+                    width = width,
+                    height = height,
+                    isFocused = handle == foreground,
+                    isMinimized = IsIconic(handle),
+                    isMaximized = IsZoomed(handle),
+                    processId = (int)pid,
+                    processName = ProcessName((int)pid, names),
+                    displayIndex = DisplayIndex(screens, handle)
+                });
                 return true;
             };
 
@@ -245,6 +430,32 @@ namespace WindowsToolService
             var result = Result();
             result["windows"] = windows;
             return result;
+        }
+
+        /// <summary>Process name for a pid, cached per enumeration; empty when access is denied.</summary>
+        private static string ProcessName(int pid, IDictionary<int, string> cache)
+        {
+            string name;
+            if (cache.TryGetValue(pid, out name)) return name;
+            try { using (var process = Process.GetProcessById(pid)) name = process.ProcessName; }
+            catch { name = ""; }
+            cache[pid] = name;
+            return name;
+        }
+
+        /// <summary>Index of the monitor a window sits on, matching the screenshot displays[].</summary>
+        private static int DisplayIndex(Screen[] screens, IntPtr handle)
+        {
+            var device = Screen.FromHandle(handle).DeviceName;
+            for (var i = 0; i < screens.Length; i++)
+                if (screens[i].DeviceName == device) return i;
+            return 0;
+        }
+
+        /// <summary>Extended window styles, using the pointer-size call that exists on both x86 and x64.</summary>
+        private static long ExStyle(IntPtr handle)
+        {
+            return (IntPtr.Size == 8 ? GetWindowLongPtr64(handle, -20) : (IntPtr)GetWindowLong32(handle, -20)).ToInt64();
         }
 
         // ── SendInput plumbing ───────────────────────────────────────────────────────
@@ -256,7 +467,12 @@ namespace WindowsToolService
 
         private static Input MouseInput(uint flags)
         {
-            return new Input { Type = 0, Data = new InputUnion { Mouse = new MouseData { Flags = flags } } };
+            return MouseInput(flags, 0);
+        }
+
+        private static Input MouseInput(uint flags, uint data)
+        {
+            return new Input { Type = 0, Data = new InputUnion { Mouse = new MouseData { Flags = flags, MouseDataValue = data } } };
         }
 
         private static void Send(Input[] inputs)
@@ -296,6 +512,11 @@ namespace WindowsToolService
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(IntPtr handle, StringBuilder text, int maximum);
         [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr handle, out Rect bounds);
         [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+        [DllImport("user32.dll", SetLastError = true)] private static extern uint GetWindowThreadProcessId(IntPtr handle, out uint processId);
+        [DllImport("user32.dll")] private static extern bool IsIconic(IntPtr handle);
+        [DllImport("user32.dll")] private static extern bool IsZoomed(IntPtr handle);
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)] private static extern IntPtr GetWindowLongPtr64(IntPtr handle, int index);
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongW", SetLastError = true)] private static extern int GetWindowLong32(IntPtr handle, int index);
         [DllImport("user32.dll", SetLastError = true)] private static extern IntPtr OpenInputDesktop(uint flags, bool inherit, uint access);
         [DllImport("user32.dll")] private static extern bool SwitchDesktop(IntPtr desktop);
         [DllImport("user32.dll")] private static extern bool CloseDesktop(IntPtr desktop);

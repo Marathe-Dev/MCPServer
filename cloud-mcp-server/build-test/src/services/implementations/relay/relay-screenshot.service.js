@@ -6,7 +6,7 @@ export class RelayScreenshotService {
         this.deviceId = deviceId;
         this.registry = registry;
     }
-    capturePrimaryDisplay() {
-        return this.registry.sendRequest(this.deviceId, "screenshot.capturePrimaryDisplay", {});
+    capture(args) {
+        return this.registry.sendRequest(this.deviceId, "screenshot.capturePrimaryDisplay", args);
     }
 }

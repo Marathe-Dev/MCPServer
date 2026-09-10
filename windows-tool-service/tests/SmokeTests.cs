@@ -138,9 +138,20 @@ namespace WindowsToolService
             var desktop = new DesktopTools(new AgentConfig { CloudUrl = "ws://127.0.0.1:4000", DeviceId = "native", DeviceName = "native", EnableCmd = true });
             var windows = (Dictionary<string, object>)(await desktop.CallAsync("window.listWindows", new Dictionary<string, object>(), CancellationToken.None));
             Assert((bool)windows["success"], "native window enumeration");
-            var screenshot = (Dictionary<string, object>)(await desktop.CallAsync("screenshot.capturePrimaryDisplay", new Dictionary<string, object>(), CancellationToken.None));
+            var windowList = (System.Collections.IList)windows["windows"];
+            var windowJson = new JavaScriptSerializer().Serialize(windowList);
+            Assert(windowList.Count == 0 || (windowJson.Contains("\"processId\"") && windowJson.Contains("\"displayIndex\"") && windowJson.Contains("\"isMinimized\"")),
+                "window list includes process, state and monitor fields");
+            var screenshot = (Dictionary<string, object>)(await desktop.CallAsync("screenshot.capturePrimaryDisplay", new Dictionary<string, object> { { "format", "png" } }, CancellationToken.None));
             var image = Convert.FromBase64String((string)screenshot["base64Data"]);
             Assert(image.Length > 8 && image[0] == 137 && image[1] == 80 && (int)screenshot["width"] > 0, "native PNG screenshot");
+            Assert(((System.Collections.IList)screenshot["displays"]).Count >= 1 && screenshot.ContainsKey("originX") && screenshot.ContainsKey("scale") && (string)screenshot["mimeType"] == "image/png",
+                "screenshot attaches display + coordinate metadata");
+            var jpegShot = (Dictionary<string, object>)(await desktop.CallAsync("screenshot.capturePrimaryDisplay", new Dictionary<string, object> { { "format", "jpeg" }, { "quality", 70 } }, CancellationToken.None));
+            var jpegBytes = Convert.FromBase64String((string)jpegShot["base64Data"]);
+            Assert(jpegBytes.Length > 3 && jpegBytes[0] == 0xFF && jpegBytes[1] == 0xD8 && (string)jpegShot["mimeType"] == "image/jpeg", "screenshot JPEG encoding");
+            var scaledShot = (Dictionary<string, object>)(await desktop.CallAsync("screenshot.capturePrimaryDisplay", new Dictionary<string, object> { { "format", "png" }, { "maxWidth", 320 } }, CancellationToken.None));
+            Assert((int)scaledShot["width"] <= 320 && Convert.ToDouble(scaledShot["scale"]) <= 1.0, "screenshot downscales to maxWidth");
             var command = new WinPtyCommand();
             var echo = await Execute(command, "echo MCP_WINPTY_OK", 10000);
             Assert((bool)echo["success"] && ((string)echo["output"]).Contains("MCP_WINPTY_OK"), "WinPTY output capture");

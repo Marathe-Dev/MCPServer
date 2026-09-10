@@ -108,12 +108,10 @@ owns launch/relaunch policy. Previously installed services are not automatically
 
 | MCP tool | Relay action | Arguments |
 | --- | --- | --- |
-| `mouse_move` | `mouse.move` | `x`, `y` (virtual-desktop pixels) |
-| `mouse_click` | `mouse.click` | `x`, `y`, `button` (left/right), `clickType` (single/double) |
-| `type_text` | `keyboard.typeText` | `text` (up to 20,000 characters) |
-| `key_press` | `keyboard.keyPress` | `keys`, e.g. `["ctrl", "s"]` |
-| `screenshot` | `screenshot.capturePrimaryDisplay` | — (returns PNG `base64Data`, width, height) |
-| `get_window_list` | `window.listWindows` | — (visible titled windows, geometry, focus) |
+| `mouse` | `mouse.move` / `mouse.click` / `mouse.scroll` / `mouse.drag` | `action`; `x`, `y`; `button`, `clickType`; `toX`, `toY` (drag); `amount`, `axis` (scroll) |
+| `keyboard` | `keyboard.typeText` / `keyboard.keyPress` | `action` (`type`/`press`); `text` or `keys` (e.g. `["ctrl", "s"]`) |
+| `screenshot` | `screenshot.capturePrimaryDisplay` | `target` (`primary`/`virtual`/`display`/`window`), `displayIndex`, `windowTitle`, `format` (`auto`/`png`/`jpeg`), `quality`, `maxWidth` |
+| `get_window_list` | `window.listWindows` | — (visible windows with geometry, focus, `processName`/`processId`, min/max state, `displayIndex`; tool windows filtered) |
 | `cmd` | `cmd.execute` | `command`, optional `workingDirectory`, `timeoutMs`, `maxOutputChars` |
 | `get_file` | `file.read` | `path` (absolute); returns `base64Data`, `name`, `size` — files over 10 MB are rejected |
 
@@ -124,7 +122,22 @@ npm --prefix cloud-mcp-server run build
 npm --prefix cloud-mcp-server start
 ```
 
-Older TypeScript-based device agents still work for the original six tools; they just reject `cmd` as unsupported.
+Older TypeScript-based device agents still handle mouse move/click and keyboard type/press, but reject `cmd`, `get_file`, and mouse `scroll`/`drag` as unsupported.
+
+### Screenshots (multi-display, window, and compression)
+
+`screenshot` captures the `primary` display by default, or the whole `virtual` desktop, a
+specific `display` (`displayIndex` from a prior capture's `displays[]`), or a `window`
+(`windowTitle` substring). Encoding is `auto` — PNG for small/text frames, JPEG for large
+ones — and you can force `format` (`png`/`jpeg`), set JPEG `quality`, or `maxWidth` to
+downscale before sending, which is the fastest way to shrink a 4K frame.
+
+Every capture attaches coordinate metadata so input lands correctly on multi-monitor setups:
+`originX`/`originY` (the captured region's top-left in virtual-desktop space), `width`/`height`
+(encoded pixels), `originalWidth`/`originalHeight`, `scale`, `displays[]`, `virtualBounds`, and
+`cursor`. Convert an image pixel to a real input coordinate as
+`realX = originX + pixelX / scale` (and likewise for Y), then pass it to `mouse_move`/`mouse_click`.
+Mixed-DPI secondary monitors may capture scaled under the current System-DPI setting.
 
 ### Using `cmd`
 

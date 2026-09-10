@@ -28,23 +28,45 @@ function fakeToolResult(message) {
             const { x, y } = message.args;
             return ok({ success: true, x, y, backend: FAKE_BACKEND, timestamp });
         }
+        case "mouse.scroll": {
+            const { amount, axis } = message.args;
+            return ok({ success: true, amount, axis, backend: FAKE_BACKEND, timestamp });
+        }
+        case "mouse.drag": {
+            const { x, y, toX, toY } = message.args;
+            return ok({ success: true, x, y, toX, toY, backend: FAKE_BACKEND, timestamp });
+        }
         case "keyboard.typeText":
         case "keyboard.keyPress":
             return ok({ success: true, backend: FAKE_BACKEND, timestamp });
-        case "screenshot.capturePrimaryDisplay":
+        case "screenshot.capturePrimaryDisplay": {
+            const jpeg = message.args.format === "jpeg";
             return ok({
                 success: true,
-                format: "png",
+                format: jpeg ? "jpeg" : "png",
+                mimeType: jpeg ? "image/jpeg" : "image/png",
                 base64Data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
                 width: 1,
                 height: 1,
+                originalWidth: 1,
+                originalHeight: 1,
+                scale: 1,
+                originX: 0,
+                originY: 0,
+                displays: [{ index: 0, x: 0, y: 0, width: 1920, height: 1080, isPrimary: true }],
+                virtualBounds: { x: 0, y: 0, width: 1920, height: 1080 },
+                cursor: { x: 0, y: 0 },
                 backend: FAKE_BACKEND,
                 timestamp,
             });
+        }
         case "window.listWindows":
             return ok({
                 success: true,
-                windows: [{ title: "Fake Window", x: 0, y: 0, width: 800, height: 600, isFocused: true }],
+                windows: [{
+                        title: "Fake Window", x: 0, y: 0, width: 800, height: 600, isFocused: true,
+                        isMinimized: false, isMaximized: false, processId: 4242, processName: "fake", displayIndex: 0,
+                    }],
                 backend: FAKE_BACKEND,
                 timestamp,
             });
@@ -113,14 +135,12 @@ test("discovers all MCP tools through the relay", async () => {
             "cmd",
             "get_file",
             "get_window_list",
-            "key_press",
+            "keyboard",
             "list_devices",
-            "mouse_click",
-            "mouse_move",
+            "mouse",
             "screenshot",
-            "type_text",
         ]);
-        const targeted = new Set(["cmd", "get_file", "get_window_list", "key_press", "mouse_click", "mouse_move", "screenshot", "type_text"]);
+        const targeted = new Set(["cmd", "get_file", "get_window_list", "keyboard", "mouse", "screenshot"]);
         for (const tool of tools.filter((tool) => targeted.has(tool.name))) {
             assert.ok(tool.inputSchema.required?.includes("deviceId"), tool.name);
             assert.ok(!Object.hasOwn(tool.inputSchema.properties ?? {}, "deviceName"), tool.name);
@@ -160,10 +180,10 @@ test("discovery preserves duplicate names, falls back to IDs and excludes offlin
 test("targeting requires deviceId rather than a display name or legacy argument", async () => {
     await withRegisteredDevice(async (client) => {
         for (const args of [{ deviceName: DEVICE_ID }, { deviceId: DEVICE_NAME }, { deviceId: "" }]) {
-            const result = await client.callTool({ name: "mouse_click", arguments: { ...args, x: 1, y: 2 } });
+            const result = await client.callTool({ name: "mouse", arguments: { action: "click", ...args, x: 1, y: 2 } });
             assert.equal(result.isError, true);
         }
-        const result = await client.callTool({ name: "mouse_click", arguments: { deviceId: DEVICE_ID, x: 1, y: 2 } });
+        const result = await client.callTool({ name: "mouse", arguments: { deviceId: DEVICE_ID, action: "click", x: 1, y: 2 } });
         assert.notEqual(result.isError, true);
         const [content] = result.content;
         assert.equal(JSON.parse(content.text).success, true);
@@ -201,11 +221,11 @@ test("get_file relays a small file and rejects oversized results", async () => {
         assert.equal(big.isError, true);
     });
 });
-test("mouse_move relays through the fake device and back", async () => {
+test("mouse relays move through the fake device and back", async () => {
     await withRegisteredDevice(async (client) => {
         const result = await client.callTool({
-            name: "mouse_move",
-            arguments: { deviceId: DEVICE_ID, x: 42, y: 84 },
+            name: "mouse",
+            arguments: { deviceId: DEVICE_ID, action: "move", x: 42, y: 84 },
         });
         const [content] = result.content;
         const parsed = JSON.parse(content.text);
@@ -215,19 +235,35 @@ test("mouse_move relays through the fake device and back", async () => {
         assert.equal(parsed.backend, FAKE_BACKEND);
     });
 });
-test("screenshot relays a real-shaped PNG payload", async () => {
+test("mouse scroll and drag relay through the fake device", async () => {
     await withRegisteredDevice(async (client) => {
-        const result = await client.callTool({
-            name: "screenshot",
-            arguments: { deviceId: DEVICE_ID },
-        });
-        const [image, meta] = result.content;
+        const scroll = await client.callTool({ name: "mouse", arguments: { deviceId: DEVICE_ID, action: "scroll", amount: -3 } });
+        const scrollParsed = JSON.parse(scroll.content[0].text);
+        assert.equal(scrollParsed.success, true);
+        assert.equal(scrollParsed.amount, -3);
+        const drag = await client.callTool({ name: "mouse", arguments: { deviceId: DEVICE_ID, action: "drag", x: 1, y: 2, toX: 9, toY: 8 } });
+        const dragParsed = JSON.parse(drag.content[0].text);
+        assert.equal(dragParsed.success, true);
+        assert.equal(dragParsed.toX, 9);
+        assert.equal(dragParsed.toY, 8);
+    });
+});
+test("screenshot relays an image with coordinate metadata and honours format", async () => {
+    await withRegisteredDevice(async (client) => {
+        const png = await client.callTool({ name: "screenshot", arguments: { deviceId: DEVICE_ID } });
+        const [image, meta] = png.content;
         assert.equal(image.type, "image");
         assert.equal(image.mimeType, "image/png");
         assert.equal(typeof image.data, "string");
         const parsed = JSON.parse(meta.text);
         assert.equal(parsed.success, true);
         assert.equal(parsed.width, 1);
+        assert.equal(parsed.originX, 0);
+        assert.ok(Array.isArray(parsed.displays) && parsed.displays.length >= 1 && parsed.displays[0].isPrimary === true);
+        assert.equal(parsed.base64Data, undefined); // stripped from the meta block
+        const jpeg = await client.callTool({ name: "screenshot", arguments: { deviceId: DEVICE_ID, format: "jpeg" } });
+        const [jpegImage] = jpeg.content;
+        assert.equal(jpegImage.mimeType, "image/jpeg");
     });
 });
 test("get_window_list relays the fake device's window list", async () => {
@@ -241,19 +277,22 @@ test("get_window_list relays the fake device's window list", async () => {
         assert.equal(parsed.success, true);
         assert.ok(Array.isArray(parsed.windows) && parsed.windows.length === 1);
         assert.equal(parsed.windows[0].title, "Fake Window");
+        assert.equal(parsed.windows[0].processName, "fake");
+        assert.equal(parsed.windows[0].displayIndex, 0);
+        assert.equal(parsed.windows[0].isMinimized, false);
     });
 });
-test("type_text and key_press succeed through the relay", async () => {
+test("keyboard type and press succeed through the relay", async () => {
     await withRegisteredDevice(async (client) => {
         const typeResult = await client.callTool({
-            name: "type_text",
-            arguments: { deviceId: DEVICE_ID, text: "hello" },
+            name: "keyboard",
+            arguments: { deviceId: DEVICE_ID, action: "type", text: "hello" },
         });
         const [typeContent] = typeResult.content;
         assert.equal(JSON.parse(typeContent.text).success, true);
         const keyResult = await client.callTool({
-            name: "key_press",
-            arguments: { deviceId: DEVICE_ID, keys: ["ctrl", "s"] },
+            name: "keyboard",
+            arguments: { deviceId: DEVICE_ID, action: "press", keys: ["ctrl", "s"] },
         });
         const [keyContent] = keyResult.content;
         assert.equal(JSON.parse(keyContent.text).success, true);
@@ -263,8 +302,8 @@ test("a tool call naming an unregistered device surfaces a clear MCP error", asy
     const harness = await setUpHarness(undefined);
     try {
         const result = await harness.client.callTool({
-            name: "mouse_move",
-            arguments: { deviceId: "unregistered-device", x: 1, y: 1 },
+            name: "mouse",
+            arguments: { deviceId: "unregistered-device", action: "move", x: 1, y: 1 },
         });
         assert.equal(result.isError, true);
     }
