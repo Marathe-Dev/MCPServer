@@ -72,6 +72,7 @@ export class DeviceRegistry {
         }
     }
     /** Sends a tool_call to a device and awaits its tool_result (or a timeout / offline error). */
+    // No separate "push back to agent" step is needed; it's the same request/response cycle, just paused in the middle.
     async sendRequest(deviceId, tool, args, timeoutMs = DEFAULT_TIMEOUT_MS) {
         const socket = this.devices.get(deviceId)?.socket;
         if (!socket) {

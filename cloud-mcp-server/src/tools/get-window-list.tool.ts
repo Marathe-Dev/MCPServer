@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import type { DeviceRegistry } from "../relay/device-registry.js";
-import { createServices } from "../services/service-factory.js";
+import type { WindowListResult } from "../models/window.models.js";
 
 /**
  * `get_window_list` — list all visible windows on a specific device, with
@@ -21,8 +21,11 @@ export function registerGetWindowListTool(
       }),
     },
     async ({ deviceId }) => {
-      const services = createServices(deviceId, deviceRegistry);
-      const result = await services.windowService.listWindows();
+      const result = await deviceRegistry.sendRequest<WindowListResult>(
+        deviceId,
+        "window.listWindows",
+        {},
+      );
       return { content: [{ type: "text", text: JSON.stringify(result) }] };
     },
   );

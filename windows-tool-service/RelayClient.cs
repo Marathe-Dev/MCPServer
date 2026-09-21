@@ -43,13 +43,17 @@ namespace WindowsToolService
                             timeout.CancelAfter(15000);
                             await socket.ConnectAsync(new Uri(config.CloudUrl.TrimEnd('/') + "/device-link"), timeout.Token).ConfigureAwait(false);
                         }
+
+                        // Send start Request for Registration of MCP tool Services
                         await SendAsync(socket, new { type = "register", deviceId = config.DeviceId, deviceName = config.DeviceName, platform = "win32" }, connection.Token).ConfigureAwait(false);
                         status("Connected");
                         delay = 1000;
+
                         while (socket.State == WebSocketState.Open && !cancellation.IsCancellationRequested)
                         {
                             var message = await ReceiveAsync(socket, connection.Token).ConfigureAwait(false);
                             if (message == null) break;
+                            Log.Write("MCP -> Received: " + new JavaScriptSerializer().Serialize(message));
                             var type = Arguments.Text(message, "type", 40);
                             if (type == "ping")
                                 await SendAsync(socket, new { type = "pong" }, connection.Token).ConfigureAwait(false);
@@ -95,10 +99,11 @@ namespace WindowsToolService
                     object rawArgs;
                     message.TryGetValue("args", out rawArgs);
                     var args = rawArgs == null ? new Dictionary<string, object>() : rawArgs as IDictionary<string, object>;
-                    if (args == null) throw new ArgumentException("args must be an object.");
+                    if (args == null) throw new ArgumentException("args must be an object."); 
                     cancellation.ThrowIfCancellationRequested();
                     status("Running " + tool);
-                    var result = await dispatch(tool, args, cancellation).ConfigureAwait(false);
+                    var result = await dispatch(tool, args, cancellation).ConfigureAwait(false); // dispatch = DesktopTools.CallAsync 
+
                     response = new { type = "tool_result", requestId = requestId, ok = true, result = result };
                 }
                 catch (Exception error)
@@ -116,6 +121,7 @@ namespace WindowsToolService
         {
             var json = new JavaScriptSerializer { MaxJsonLength = 64 * 1024 * 1024 }.Serialize(message);
             var bytes = Encoding.UTF8.GetBytes(json);
+            Log.Write("MCP <- Sent: " + json);
             await sendGate.WaitAsync(cancellation).ConfigureAwait(false);
             try { await socket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, cancellation).ConfigureAwait(false); }
             finally { sendGate.Release(); }

@@ -1,10 +1,14 @@
-import { createServer as createHttpServer, type Server } from "node:http";
+import {
+  createServer as createHttpServer,
+  type IncomingMessage,
+  type ServerResponse,
+  type Server,
+} from "node:http";
 import {
   createMcpHandler,
   type McpHttpHandler,
 } from "@modelcontextprotocol/server";
 import { toNodeHandler } from "@modelcontextprotocol/node";
-import express from "express";
 import { createServer } from "./server/create-server.js";
 import { DeviceRegistry } from "./relay/device-registry.js";
 import { createDeviceLinkServer } from "./relay/device-link-server.js";
@@ -21,6 +25,9 @@ export interface CloudApp {
  * Builds the app (universal MCP HTTP routing + `/device-link` WS upgrade)
  * without starting to listen — kept separate from `index.ts` so tests can
  * bind an ephemeral port.
+ *
+ * No Express here: MCP HTTP and the WS upgrade must share one raw
+ * node:http.Server, and routing three paths doesn't need a framework.
  */
 export function createApp(): CloudApp {
   const deviceRegistry = new DeviceRegistry();
@@ -29,32 +36,33 @@ export function createApp(): CloudApp {
   const mcpHandler = createMcpHandler(() => createServer(deviceRegistry));
   const mcpNodeHandler = toNodeHandler(mcpHandler);
 
-  const expressApp = express();
-  expressApp.use((req, _res, next) => {
-    console.error(`[cloud-mcp-server] http ${req.method} ${req.path}`);
-    next();
+  const httpServer = createHttpServer((req: IncomingMessage, res: ServerResponse) => {
+    const { pathname } = new URL(req.url ?? "/", "http://localhost");
+    console.error(`[cloud-mcp-server] http ${req.method} ${pathname}`);
+
+    if (pathname === "/") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ status: "ok", service: "cloud-mcp-server" }));
+      return;
+    }
+
+    if (MCP_PATH.test(pathname)) {
+      Promise.resolve(mcpNodeHandler(req, res)).catch((error: unknown) => {
+        console.error(`[cloud-mcp-server] mcp handler error: ${String(error)}`);
+        if (!res.headersSent) {
+          res.writeHead(500, { "content-type": "text/plain" });
+          res.end("Internal server error");
+        }
+      });
+      return;
+    }
+
+    console.error(`[cloud-mcp-server] 404 ${pathname}`);
+    res.writeHead(404, { "content-type": "text/plain" });
+    res.end("Not found. Connect an MCP client to /mcp.");
   });
 
-  expressApp.get("/", (_req, res) => {
-    res.json({ status: "ok", service: "cloud-mcp-server" });
-  });
-
-  expressApp.all(MCP_PATH, (req, res) => {
-    Promise.resolve(mcpNodeHandler(req, res)).catch((error: unknown) => {
-      console.error(`[cloud-mcp-server] mcp handler error: ${String(error)}`);
-      if (!res.headersSent) {
-        res.writeHead(500, { "content-type": "text/plain" });
-        res.end("Internal server error");
-      }
-    });
-  });
-
-  expressApp.use((_req, res) => {
-    res.status(404).type("text/plain").send("Not found. Connect an MCP client to /mcp.");
-  });
-
-  const httpServer = createHttpServer(expressApp);
-
+  // For WebSocket handshake - share one port for both normal HTTP (/mcp) and WebSocket (/device-link).
   httpServer.on("upgrade", (req, socket, head) => {
     console.error(`[cloud-mcp-server] ws upgrade request: ${req.url}`);
     if (req.url === "/device-link") {

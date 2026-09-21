@@ -11,5 +11,8 @@ export interface CloudApp {
  * Builds the app (universal MCP HTTP routing + `/device-link` WS upgrade)
  * without starting to listen — kept separate from `index.ts` so tests can
  * bind an ephemeral port.
+ *
+ * No Express here: MCP HTTP and the WS upgrade must share one raw
+ * node:http.Server, and routing three paths doesn't need a framework.
  */
 export declare function createApp(): CloudApp;

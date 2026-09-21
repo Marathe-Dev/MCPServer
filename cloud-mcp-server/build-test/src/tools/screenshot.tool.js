@@ -1,5 +1,4 @@
 import * as z from "zod/v4";
-import { createServices } from "../services/service-factory.js";
 /**
  * `screenshot` — capture a device's screen (primary display, a specific display,
  * the whole virtual desktop, or a window) as an image with display + coordinate
@@ -19,8 +18,7 @@ export function registerScreenshotTool(server, deviceRegistry) {
             maxWidth: z.number().int().min(16).max(10000).optional().describe("Downscale so the image width is at most this many pixels"),
         }),
     }, async ({ deviceId, ...args }) => {
-        const services = createServices(deviceId, deviceRegistry);
-        const result = await services.screenshotService.capture(args);
+        const result = await deviceRegistry.sendRequest(deviceId, "screenshot.capturePrimaryDisplay", args);
         const { base64Data, ...meta } = result;
         return {
             content: [

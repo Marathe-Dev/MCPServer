@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import type { DeviceRegistry } from "../relay/device-registry.js";
-import { createServices } from "../services/service-factory.js";
+import type { ScreenshotResult } from "../models/screenshot.models.js";
 
 /**
  * `screenshot` — capture a device's screen (primary display, a specific display,
@@ -29,8 +29,11 @@ export function registerScreenshotTool(
       }),
     },
     async ({ deviceId, ...args }) => {
-      const services = createServices(deviceId, deviceRegistry);
-      const result = await services.screenshotService.capture(args);
+      const result = await deviceRegistry.sendRequest<ScreenshotResult>(
+        deviceId,
+        "screenshot.capturePrimaryDisplay",
+        args,
+      );
       const { base64Data, ...meta } = result;
       return {
         content: [

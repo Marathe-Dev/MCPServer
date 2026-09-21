@@ -33,7 +33,7 @@ function withToolCallLogging(server: McpServer): McpServer {
       name,
       config as never,
       (async (...handlerArgs: unknown[]) => {
-        console.error(`[cloud-mcp-server] tool_call name=${name} args=${JSON.stringify(handlerArgs[0] ?? {})}`);
+        console.log(`[cloud-mcp-server] tool_call name=${name} args=${JSON.stringify(handlerArgs[0] ?? {})}`);
         try {
           const result = await handler(...handlerArgs);
           console.error(`[cloud-mcp-server] tool_result name=${name} success=true`);
