@@ -23,7 +23,7 @@ namespace WindowsToolService
                 : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             if (!Path.IsPathRooted(directory) || !Directory.Exists(directory)) throw new ArgumentException("workingDirectory must be an existing absolute directory.");
             var timeoutMs = Arguments.Integer(args, "timeoutMs", 100, 20000, 10000);
-            var maxOutputChars = Arguments.Integer(args, "maxOutputChars", 1024, 1048576, 65536);
+            var maxOutputChars = Arguments.Integer(args, "maxOutputChars", 1024, 400000, 65536);
             if (!File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "winpty.dll")) ||
                 !File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "winpty-agent.exe")))
                 throw new FileNotFoundException("Install matching x64 winpty.dll and winpty-agent.exe beside WindowsToolService.exe. See README.");

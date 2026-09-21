@@ -45,9 +45,11 @@ namespace WindowsToolService
                         throw new InvalidOperationException("CMD is disabled. Enable remote CMD in the agent window.");
                     return await _command.ExecuteAsync(args, token).ConfigureAwait(false);
 
-                // File read — no desktop required.
+                // File read — no desktop required; upload to storage when configured, else inline base64.
                 case "file.read":
-                    return FileTools.Read(args);
+                    return _config.StorageEnabled
+                        ? await FileTools.UploadAsync(args, _config, token).ConfigureAwait(false)
+                        : FileTools.Read(args);
 
                 // Desktop input / capture — needs an unlocked, interactive desktop.
                 case "mouse.move":  RequireInteractiveDesktop(); return Move(args, click: false);
@@ -56,7 +58,7 @@ namespace WindowsToolService
                 case "mouse.drag": RequireInteractiveDesktop(); return Drag(args);
                 case "keyboard.typeText": RequireInteractiveDesktop(); return TypeText(args);
                 case "keyboard.keyPress": RequireInteractiveDesktop(); return Press(args);
-                case "screenshot.capturePrimaryDisplay": RequireInteractiveDesktop(); return Capture(args);
+                case "screenshot.capturePrimaryDisplay": RequireInteractiveDesktop(); return await CaptureAsync(args, token).ConfigureAwait(false);
                 case "window.listWindows": RequireInteractiveDesktop(); return Windows();
 
                 default:
@@ -247,8 +249,8 @@ namespace WindowsToolService
 
         private const long AutoPngMaxPixels = 1000000;
 
-        /// <summary>Captures a target region (primary/virtual/display/window) as PNG or JPEG with coordinate metadata.</summary>
-        private static object Capture(IDictionary<string, object> args)
+        /// <summary>Captures a target region and its metadata; encoded bytes come back via out params (no base64).</summary>
+        private static Dictionary<string, object> CaptureCore(IDictionary<string, object> args, out byte[] bytes, out string mimeType, out string format)
         {
             var target = Arguments.Choice(args, "target", "primary", "primary", "virtual", "display", "window");
             Rectangle source;
@@ -270,7 +272,7 @@ namespace WindowsToolService
             }
             if (source.Width <= 0 || source.Height <= 0) throw new InvalidOperationException("Capture region is empty.");
 
-            var format = Arguments.Choice(args, "format", "auto", "auto", "png", "jpeg");
+            var requestedFormat = Arguments.Choice(args, "format", "auto", "auto", "png", "jpeg");
             var quality = Arguments.Integer(args, "quality", 1, 100, 80);
             var maxWidth = args.ContainsKey("maxWidth") ? Arguments.Integer(args, "maxWidth", 16, 10000) : 0;
 
@@ -299,8 +301,7 @@ namespace WindowsToolService
                     }
 
                     // Auto keeps small/text frames as lossless PNG and switches large frames to JPEG to cut size.
-                    var jpeg = format == "jpeg" || (format == "auto" && (long)encoded.Width * encoded.Height > AutoPngMaxPixels);
-                    byte[] bytes;
+                    var jpeg = requestedFormat == "jpeg" || (requestedFormat == "auto" && (long)encoded.Width * encoded.Height > AutoPngMaxPixels);
                     using (var stream = new MemoryStream())
                     {
                         if (jpeg) SaveJpeg(encoded, stream, quality);
@@ -308,10 +309,11 @@ namespace WindowsToolService
                         bytes = stream.ToArray();
                     }
 
+                    format = jpeg ? "jpeg" : "png";
+                    mimeType = jpeg ? "image/jpeg" : "image/png";
                     var result = Result();
-                    result["format"] = jpeg ? "jpeg" : "png";
-                    result["mimeType"] = jpeg ? "image/jpeg" : "image/png";
-                    result["base64Data"] = Convert.ToBase64String(bytes);
+                    result["format"] = format;
+                    result["mimeType"] = mimeType;
                     result["width"] = encoded.Width;
                     result["height"] = encoded.Height;
                     result["originalWidth"] = source.Width;
@@ -328,6 +330,26 @@ namespace WindowsToolService
                 }
                 finally { if (scaled != null) scaled.Dispose(); }
             }
+        }
+
+        /// <summary>Captures a screenshot; uploads to storage and returns a URL, or inlines base64.</summary>
+        private async Task<object> CaptureAsync(IDictionary<string, object> args, CancellationToken token)
+        {
+            byte[] bytes;
+            string mimeType, format;
+            var result = CaptureCore(args, out bytes, out mimeType, out format);
+            if (_config.StorageEnabled)
+            {
+                var key = "screenshots/" + _config.DeviceId + "/" + Guid.NewGuid().ToString("N") + "." + (format == "jpeg" ? "jpg" : "png");
+                result["uploaded"] = true;
+                result["size"] = bytes.Length;
+                result["url"] = await new S3Presigner(_config).UploadAsync(key, bytes, mimeType, _config.StorageGetTtlSeconds, token).ConfigureAwait(false);
+            }
+            else
+            {
+                result["base64Data"] = Convert.ToBase64String(bytes);
+            }
+            return result;
         }
 
         /// <summary>Metadata for every display so the agent can map screenshot pixels to input coordinates.</summary>

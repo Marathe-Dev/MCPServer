@@ -139,6 +139,32 @@ Every capture attaches coordinate metadata so input lands correctly on multi-mon
 `realX = originX + pixelX / scale` (and likewise for Y), then pass it to `mouse_move`/`mouse_click`.
 Mixed-DPI secondary monitors may capture scaled under the current System-DPI setting.
 
+### Presigned file uploads (storage)
+
+When S3-compatible storage (IDrive e2) is configured, the agent uploads screenshots and
+`get_file` results **directly to the bucket** and returns a short-lived **presigned URL**
+instead of base64 — keeping every relay message small (needed when a broker caps message size,
+e.g. 500 KB). The AI agent downloads the URL with **no credentials**: the signature and expiry
+are embedded in the query string, the bucket stays private, and the link is scoped to that one
+object until it expires (default 15 minutes). Without storage configured, both tools fall back
+to inline base64.
+
+Configure with environment variables. The access/secret keys are read from the environment
+only and are never written to `config.json`:
+
+```powershell
+$env:E2_ENDPOINT          = "https://<your-idrive-e2-endpoint>"
+$env:E2_REGION            = "us-east-1"
+$env:E2_BUCKET            = "your-bucket"
+$env:E2_ACCESS_KEY_ID     = "..."
+$env:E2_SECRET_ACCESS_KEY = "..."
+```
+
+Because the key lives on the device, use a **scoped** key (only `PutObject`/`GetObject` on this
+bucket) and add a bucket lifecycle rule to expire old objects. `cmd` output is capped at 400,000
+characters so a single result fits the broker limit; any result that would still exceed ~500 KB
+is rejected with a clear error.
+
 ### Using `cmd`
 
 ```json

@@ -1,0 +1,304 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "tools": [
+      {
+        "name": "list_devices",
+        "description": "List connected desktops with deviceId and readable deviceName. Use deviceId to target other tools; names are display labels and may not be unique.",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {}
+        }
+      },
+      {
+        "name": "screenshot",
+        "description": "Capture a device's screen as an image with display + coordinate metadata. Target the primary display, a specific display, the whole virtual desktop, or a window. Large frames auto-compress to JPEG. Map a pixel to a real coordinate as originX + pixelX / scale.",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "deviceId": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Target deviceId from list_devices; not the readable deviceName"
+            },
+            "target": {
+              "default": "primary",
+              "description": "primary display, whole virtual desktop, a specific display, or a window",
+              "type": "string",
+              "enum": [
+                "primary",
+                "virtual",
+                "display",
+                "window"
+              ]
+            },
+            "displayIndex": {
+              "description": "Monitor index (from a prior screenshot's displays[]) when target=display",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "windowTitle": {
+              "description": "Window title substring when target=window",
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "format": {
+              "default": "auto",
+              "description": "auto = PNG for small frames, JPEG for large",
+              "type": "string",
+              "enum": [
+                "auto",
+                "png",
+                "jpeg"
+              ]
+            },
+            "quality": {
+              "default": 80,
+              "description": "JPEG quality when JPEG is used",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "maxWidth": {
+              "description": "Downscale so the image width is at most this many pixels",
+              "type": "integer",
+              "minimum": 16,
+              "maximum": 10000
+            }
+          },
+          "required": [
+            "deviceId"
+          ]
+        }
+      },
+      {
+        "name": "mouse",
+        "description": "Control a device's mouse. action=move (x,y); click (x,y,button,clickType); scroll (amount = ± notches, optional x,y and axis); drag (from x,y to toX,toY holding button). Coordinates are virtual-desktop pixels — map from a screenshot as originX + pixelX / scale.",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "deviceId": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Target deviceId from list_devices; not the readable deviceName"
+            },
+            "action": {
+              "type": "string",
+              "enum": [
+                "move",
+                "click",
+                "scroll",
+                "drag"
+              ],
+              "description": "Which mouse action to perform"
+            },
+            "x": {
+              "description": "X pixel — move/click target, scroll point, or drag start",
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "y": {
+              "description": "Y pixel — move/click target, scroll point, or drag start",
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "button": {
+              "default": "left",
+              "description": "Button for click and drag",
+              "type": "string",
+              "enum": [
+                "left",
+                "right"
+              ]
+            },
+            "clickType": {
+              "default": "single",
+              "description": "Single or double click",
+              "type": "string",
+              "enum": [
+                "single",
+                "double"
+              ]
+            },
+            "toX": {
+              "description": "Drag end X pixel",
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "toY": {
+              "description": "Drag end Y pixel",
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "amount": {
+              "description": "Scroll notches; positive = up / right",
+              "type": "integer",
+              "minimum": -100,
+              "maximum": 100
+            },
+            "axis": {
+              "default": "vertical",
+              "description": "Scroll axis",
+              "type": "string",
+              "enum": [
+                "vertical",
+                "horizontal"
+              ]
+            }
+          },
+          "required": [
+            "deviceId",
+            "action"
+          ]
+        }
+      },
+      {
+        "name": "keyboard",
+        "description": "Send keyboard input to a device. action=type sends the literal text; action=press taps a key combination together (e.g. Ctrl+S).",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "deviceId": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Target deviceId from list_devices; not the readable deviceName"
+            },
+            "action": {
+              "type": "string",
+              "enum": [
+                "type",
+                "press"
+              ],
+              "description": "type = literal text; press = key combo"
+            },
+            "text": {
+              "description": "Text to type when action=type",
+              "type": "string",
+              "maxLength": 20000
+            },
+            "keys": {
+              "description": "Keys to press together when action=press, e.g. [\"ctrl\", \"s\"]",
+              "minItems": 1,
+              "maxItems": 16,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "deviceId",
+            "action"
+          ]
+        }
+      },
+      {
+        "name": "get_window_list",
+        "description": "List all visible windows with titles and positions on a specific device",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "deviceId": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Target deviceId from list_devices; not the readable deviceName"
+            }
+          },
+          "required": [
+            "deviceId"
+          ]
+        }
+      },
+      {
+        "name": "cmd",
+        "description": "Run a CMD command through WinPTY on the Windows WPF tool service. Requires local CMD opt-in. Each call starts a fresh shell as the signed-in user. Output is terminal text, possibly including ANSI escapes. Do not use for interactive prompts or long-running servers.",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "deviceId": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Target deviceId from list_devices; not the readable deviceName"
+            },
+            "command": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 8000
+            },
+            "workingDirectory": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32767
+            },
+            "timeoutMs": {
+              "default": 10000,
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 20000
+            },
+            "maxOutputChars": {
+              "default": 65536,
+              "type": "integer",
+              "minimum": 1024,
+              "maximum": 400000
+            }
+          },
+          "required": [
+            "deviceId",
+            "command"
+          ]
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "idempotentHint": false,
+          "openWorldHint": true
+        }
+      },
+      {
+        "name": "get_file",
+        "description": "Read a file from the Windows tool service device and return it as base64. Absolute Windows path required. Files larger than 10 MB are rejected.",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "deviceId": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Target deviceId from list_devices; not the readable deviceName"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32767,
+              "description": "Absolute path to the file on the device"
+            }
+          },
+          "required": [
+            "deviceId",
+            "path"
+          ]
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": true
+        }
+      }
+    ]
+  }
+}

@@ -57,6 +57,7 @@
     <Reference Include="System.Configuration" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Xaml" />
+    <Reference Include="System.Net.Http" />
     <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
@@ -80,6 +81,7 @@
     <Compile Include="AgentConfig.cs" />
     <Compile Include="DesktopTools.cs" />
     <Compile Include="FileTools.cs" />
+    <Compile Include="S3Presigner.cs" />
     <Compile Include="Log.cs" />
     <Compile Include="RelayClient.cs" />
     <Compile Include="WinPtyCommand.cs" />

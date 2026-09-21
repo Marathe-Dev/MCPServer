@@ -2,7 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
@@ -103,6 +106,46 @@ namespace WindowsToolService
                 File.WriteAllBytes(logFile, new byte[(1024 * 1024) + 4096]);
                 Log.Write("after overflow");
                 Assert(new FileInfo(logFile).Length <= 1024 * 1024, "logger trims when oversized");
+
+                // SigV4 signing key matches AWS's documented example (proves the crypto chain).
+                var signingKey = S3Presigner.DeriveSigningKey("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "20120215", "us-east-1", "iam");
+                var expectedKey = new byte[] { 0, 74, 168, 6, 225, 61, 174, 136, 185, 3, 45, 146, 97, 188, 176, 76, 103, 208, 35, 175, 173, 210, 33, 230, 176, 210, 6, 225, 118, 14, 11, 94 };
+                Assert(signingKey.SequenceEqual(expectedKey), "SigV4 signing key matches AWS example");
+
+                // Presigned upload: agent uploads to storage and returns a credential-free GET URL.
+                using (var bucket = new FakeBucket())
+                {
+                    var storage = new AgentConfig { CloudUrl = "ws://127.0.0.1:4000", DeviceId = "dev", DeviceName = "dev",
+                        StorageEndpoint = bucket.Endpoint, StorageRegion = "us-east-1", StorageBucket = "b",
+                        StorageAccessKey = "AKID", StorageSecretKey = "secret", StorageGetTtlSeconds = 900 };
+                    Assert(storage.StorageEnabled, "storage enabled when fully configured");
+
+                    var presigned = new S3Presigner(storage).Presign("GET", "a/b c.png", 900);
+                    Assert(presigned.Contains("X-Amz-Algorithm=AWS4-HMAC-SHA256") && presigned.Contains("X-Amz-Signature=") && presigned.Contains("b%20c.png"),
+                        "presigned URL carries the signature and encoded key");
+
+                    var uploadFile = Path.Combine(Path.GetTempPath(), "wts-upload-" + Guid.NewGuid().ToString("N") + ".bin");
+                    File.WriteAllBytes(uploadFile, new byte[] { 1, 2, 3, 4, 5 });
+                    try
+                    {
+                        var tools = new DesktopTools(storage);
+                        var uploaded = (Dictionary<string, object>)tools.CallAsync("file.read", new Dictionary<string, object> { { "path", uploadFile } }, CancellationToken.None).GetAwaiter().GetResult();
+                        Assert((bool)uploaded["uploaded"] && !uploaded.ContainsKey("base64Data") && ((string)uploaded["url"]).StartsWith(bucket.Endpoint),
+                            "file.read uploads and returns a URL");
+                        using (var http = new System.Net.Http.HttpClient())
+                        {
+                            var downloaded = http.GetByteArrayAsync((string)uploaded["url"]).GetAwaiter().GetResult();
+                            Assert(downloaded.Length == 5 && downloaded[0] == 1 && downloaded[4] == 5, "presigned URL downloads exact bytes with no credentials");
+                        }
+                    }
+                    finally { try { File.Delete(uploadFile); } catch { } }
+                }
+
+                // Broker guard: any result over 500 KB is replaced with an error.
+                var capMethod = typeof(RelayClient).GetMethod("CapResult", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+                var small = capMethod.Invoke(null, new object[] { new Dictionary<string, object> { { "ok", true } }, "r" });
+                var big = capMethod.Invoke(null, new object[] { new Dictionary<string, object> { { "blob", new string('x', 600 * 1024) } }, "r" });
+                Assert(small == null && big != null, "relay guards results over 500 KB");
                 if (args.Contains("--native"))
                 {
                     NativeAsync().GetAwaiter().GetResult();
@@ -152,6 +195,22 @@ namespace WindowsToolService
             Assert(jpegBytes.Length > 3 && jpegBytes[0] == 0xFF && jpegBytes[1] == 0xD8 && (string)jpegShot["mimeType"] == "image/jpeg", "screenshot JPEG encoding");
             var scaledShot = (Dictionary<string, object>)(await desktop.CallAsync("screenshot.capturePrimaryDisplay", new Dictionary<string, object> { { "format", "png" }, { "maxWidth", 320 } }, CancellationToken.None));
             Assert((int)scaledShot["width"] <= 320 && Convert.ToDouble(scaledShot["scale"]) <= 1.0, "screenshot downscales to maxWidth");
+
+            using (var bucket = new FakeBucket())
+            {
+                var storage = new AgentConfig { CloudUrl = "ws://127.0.0.1:4000", DeviceId = "dev", DeviceName = "dev",
+                    StorageEndpoint = bucket.Endpoint, StorageRegion = "us-east-1", StorageBucket = "b",
+                    StorageAccessKey = "AKID", StorageSecretKey = "secret", StorageGetTtlSeconds = 900 };
+                var uploadTools = new DesktopTools(storage);
+                var shot = (Dictionary<string, object>)(await uploadTools.CallAsync("screenshot.capturePrimaryDisplay", new Dictionary<string, object>(), CancellationToken.None));
+                Assert((bool)shot["uploaded"] && !shot.ContainsKey("base64Data") && ((string)shot["url"]).Contains("X-Amz-Signature"), "screenshot uploads and returns a URL");
+                using (var http = new System.Net.Http.HttpClient())
+                {
+                    var img = await http.GetByteArrayAsync((string)shot["url"]);
+                    Assert(img.Length > 8 && ((img[0] == 0xFF && img[1] == 0xD8) || (img[0] == 137 && img[1] == 80)), "uploaded screenshot downloads valid image bytes");
+                }
+            }
+
             var command = new WinPtyCommand();
             var echo = await Execute(command, "echo MCP_WINPTY_OK", 10000);
             Assert((bool)echo["success"] && ((string)echo["output"]).Contains("MCP_WINPTY_OK"), "WinPTY output capture");
@@ -172,6 +231,9 @@ namespace WindowsToolService
             }
             var again = await Execute(command, "echo RECOVERED", 10000);
             Assert((bool)again["success"], "WinPTY recovery after cancellation");
+
+            try { await command.ExecuteAsync(new Dictionary<string, object> { { "command", "echo x" }, { "maxOutputChars", 500000 } }, CancellationToken.None); throw new Exception("Expected cap rejection."); }
+            catch (ArgumentException) { Assert(true, "WinPTY maxOutputChars capped at 400000"); }
         }
 
         private static async Task RelayAsync(string url)
@@ -240,6 +302,89 @@ namespace WindowsToolService
             if (!condition) throw new Exception("Failed: " + name);
             checks++;
             Console.WriteLine("PASS " + name);
+        }
+
+        /// <summary>Loopback HTTP server standing in for the S3-compatible bucket in upload tests.</summary>
+        private sealed class FakeBucket : IDisposable
+        {
+            private readonly TcpListener _listener;
+            private readonly Dictionary<string, byte[]> _objects = new Dictionary<string, byte[]>();
+            internal string Endpoint { get; private set; }
+
+            internal FakeBucket()
+            {
+                _listener = new TcpListener(IPAddress.Loopback, 0);
+                _listener.Start();
+                Endpoint = "http://127.0.0.1:" + ((IPEndPoint)_listener.LocalEndpoint).Port;
+                Task.Run(() => AcceptLoop());
+            }
+
+            private async Task AcceptLoop()
+            {
+                while (true)
+                {
+                    TcpClient client;
+                    try { client = await _listener.AcceptTcpClientAsync().ConfigureAwait(false); }
+                    catch { return; }
+                    try { Handle(client); } catch { }
+                }
+            }
+
+            private void Handle(TcpClient client)
+            {
+                using (client)
+                using (var stream = client.GetStream())
+                {
+                    var header = new List<byte>();
+                    var one = new byte[1];
+                    while (!(header.Count >= 4 && header[header.Count - 4] == 13 && header[header.Count - 3] == 10 && header[header.Count - 2] == 13 && header[header.Count - 1] == 10))
+                    {
+                        if (stream.Read(one, 0, 1) == 0) return;
+                        header.Add(one[0]);
+                    }
+                    var lines = Encoding.ASCII.GetString(header.ToArray()).Split(new[] { "\r\n" }, StringSplitOptions.None);
+                    var request = lines[0].Split(' ');
+                    var method = request[0];
+                    var path = request.Length > 1 ? request[1] : "/";
+                    var query = path.IndexOf('?');
+                    if (query >= 0) path = path.Substring(0, query);
+                    var contentLength = 0;
+                    foreach (var line in lines)
+                        if (line.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
+                            int.TryParse(line.Substring(15).Trim(), out contentLength);
+
+                    if (method == "PUT")
+                    {
+                        var body = new byte[contentLength];
+                        var read = 0;
+                        while (read < contentLength)
+                        {
+                            var n = stream.Read(body, read, contentLength - read);
+                            if (n == 0) break;
+                            read += n;
+                        }
+                        lock (_objects) _objects[path] = body;
+                        Respond(stream, "200 OK", new byte[0]);
+                    }
+                    else if (method == "GET")
+                    {
+                        byte[] body;
+                        lock (_objects) _objects.TryGetValue(path, out body);
+                        Respond(stream, body == null ? "404 Not Found" : "200 OK", body ?? new byte[0]);
+                    }
+                    else Respond(stream, "405 Method Not Allowed", new byte[0]);
+                }
+            }
+
+            private static void Respond(NetworkStream stream, string status, byte[] body)
+            {
+                var head = Encoding.ASCII.GetBytes("HTTP/1.1 " + status + "\r\nContent-Length: " + body.Length + "\r\nConnection: close\r\n\r\n");
+                stream.Write(head, 0, head.Length);
+                if (body.Length > 0) stream.Write(body, 0, body.Length);
+                stream.Flush();
+            }
+
+            public void Dispose() { try { _listener.Stop(); } catch { } }
         }
     }
 }

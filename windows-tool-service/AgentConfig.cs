@@ -13,6 +13,26 @@ namespace WindowsToolService
         public bool EnableCmd { get; set; }
         public bool AutoConnectOnStartup { get; set; }
 
+        // Storage endpoint/region/bucket may live in config.json; access + secret keys come from env only.
+        public string E2StorageEndpoint { get; set; }
+        public string E2StorageRegion { get; set; }
+        public string E2StorageBucket { get; set; }
+        public int StorageGetTtlSeconds { get; set; }
+        public string E2StorageAccessKey { get; set; }
+        public string E2StorageSecretKey { get; set; }
+
+        /// <summary>True when screenshots/files should be uploaded to storage and returned as a presigned URL.</summary>
+        [ScriptIgnore]
+        internal bool StorageEnabled
+        {
+            get
+            {
+                return !string.IsNullOrEmpty(E2StorageEndpoint) && !string.IsNullOrEmpty(E2StorageRegion)
+                    && !string.IsNullOrEmpty(E2StorageBucket) && !string.IsNullOrEmpty(E2StorageAccessKey)
+                    && !string.IsNullOrEmpty(E2StorageSecretKey);
+            }
+        }
+
         internal static string ConfigPath
         {
             get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WindowsMcpToolService", "config.json"); }
@@ -20,13 +40,27 @@ namespace WindowsToolService
 
         internal static AgentConfig Load()
         {
-            var config = File.Exists(ConfigPath)
+            var config = File.Exists(ConfigPath)  // C:\Users\Hemanth\AppData\Local\WindowsMcpToolService\config.json
                 ? new JavaScriptSerializer().Deserialize<AgentConfig>(File.ReadAllText(ConfigPath))
                 : new AgentConfig { CloudUrl = "ws://127.0.0.1:4000", DeviceId = Guid.NewGuid().ToString(), DeviceName = Environment.MachineName };
-            if (config == null) throw new InvalidDataException("Invalid agent configuration.");
-            config.CloudUrl = Environment.GetEnvironmentVariable("CLOUD_URL") ?? config.CloudUrl;
-            config.DeviceId = Environment.GetEnvironmentVariable("DEVICE_ID") ?? config.DeviceId;
-            config.DeviceName = Environment.GetEnvironmentVariable("DEVICE_NAME") ?? config.DeviceName;
+
+            if (config == null) 
+                throw new InvalidDataException("Invalid agent configuration.");
+
+            // Environment.GetEnvironmentVariable("CLOUD_URL") - To Read from the env variable
+
+            config.CloudUrl = config.CloudUrl; 
+            config.DeviceId = config.DeviceId;
+            config.DeviceName = config.DeviceName;
+            config.E2StorageEndpoint = config.E2StorageEndpoint; // "https://<your-idrive-e2-endpoint>"
+            config.E2StorageRegion = config.E2StorageRegion; // "us-east-1"
+            config.E2StorageBucket = config.E2StorageBucket; // "your-bucket"
+            config.E2StorageAccessKey = config.E2StorageAccessKey;
+            config.E2StorageSecretKey = config.E2StorageSecretKey;
+
+            if (config.StorageGetTtlSeconds <= 0) 
+                config.StorageGetTtlSeconds = 900;
+
             config.Validate();
             return config;
         }
@@ -38,11 +72,22 @@ namespace WindowsToolService
                 (endpoint.Scheme != "ws" && endpoint.Scheme != "wss") ||
                 !string.IsNullOrEmpty(endpoint.UserInfo) || !string.IsNullOrEmpty(endpoint.Query) || !string.IsNullOrEmpty(endpoint.Fragment))
                 throw new ArgumentException("Cloud URL must be a ws:// or wss:// base URL without credentials, query or fragment.");
+            
             if (endpoint.Scheme == "ws" && !endpoint.IsLoopback)
                 throw new ArgumentException("Remote connections require wss://. Plain ws:// is allowed only on loopback.");
+            
             if (string.IsNullOrWhiteSpace(DeviceId) || DeviceId.Length > 200)
                 throw new ArgumentException("Device ID is required (maximum 200 characters).");
-            if (string.IsNullOrWhiteSpace(DeviceName)) throw new ArgumentException("Device name is required.");
+            
+            if (string.IsNullOrWhiteSpace(DeviceName)) 
+                throw new ArgumentException("Device name is required.");
+            
+            if (!string.IsNullOrEmpty(E2StorageEndpoint))
+            {
+                Uri storage;
+                if (!Uri.TryCreate(E2StorageEndpoint, UriKind.Absolute, out storage) || storage.Scheme != "https")
+                    throw new ArgumentException("Storage endpoint must be an absolute https URL.");
+            }
         }
 
         internal void Save()

@@ -18,8 +18,12 @@ export function registerScreenshotTool(server, deviceRegistry) {
             maxWidth: z.number().int().min(16).max(10000).optional().describe("Downscale so the image width is at most this many pixels"),
         }),
     }, async ({ deviceId, ...args }) => {
-        const result = await deviceRegistry.sendRequest(deviceId, "screenshot.capturePrimaryDisplay", args);
+        const result = await deviceRegistry.sendRequest(deviceId, "screenshot.capturePrimaryDisplay", args, 60000);
         const { base64Data, ...meta } = result;
+        // Uploaded frames come back as a presigned URL (no bytes on the wire).
+        if (result.url || !base64Data) {
+            return { content: [{ type: "text", text: JSON.stringify(meta) }] };
+        }
         return {
             content: [
                 {

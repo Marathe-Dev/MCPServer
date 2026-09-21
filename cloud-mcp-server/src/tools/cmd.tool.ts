@@ -16,7 +16,7 @@ export function registerCmdTool(server: McpServer, deviceRegistry: DeviceRegistr
         ),
         workingDirectory: z.string().min(1).max(32767).optional(),
         timeoutMs: z.number().int().min(100).max(20000).default(10000),
-        maxOutputChars: z.number().int().min(1024).max(1048576).default(65536),
+        maxOutputChars: z.number().int().min(1024).max(400000).default(65536),
       }),
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
