@@ -45,11 +45,11 @@ namespace WindowsToolService
                         throw new InvalidOperationException("CMD is disabled. Enable remote CMD in the agent window.");
                     return await _command.ExecuteAsync(args, token).ConfigureAwait(false);
 
-                // File read — no desktop required; upload to storage when configured, else inline base64.
+                // File read — no desktop required; always uploads to storage and returns a URL, never inline bytes.
                 case "file.read":
-                    return _config.StorageEnabled
-                        ? await FileTools.UploadAsync(args, _config, token).ConfigureAwait(false)
-                        : FileTools.Read(args);
+                    if (!_config.StorageEnabled)
+                        throw new InvalidOperationException("Storage is not configured on this device. Configure storage to use file.read.");
+                    return await FileTools.UploadAsync(args, _config, token).ConfigureAwait(false);
 
                 // Desktop input / capture — needs an unlocked, interactive desktop.
                 case "mouse.move":  RequireInteractiveDesktop(); return Move(args, click: false);
@@ -58,7 +58,7 @@ namespace WindowsToolService
                 case "mouse.drag": RequireInteractiveDesktop(); return Drag(args);
                 case "keyboard.typeText": RequireInteractiveDesktop(); return TypeText(args);
                 case "keyboard.keyPress": RequireInteractiveDesktop(); return Press(args);
-                case "screenshot.capturePrimaryDisplay": RequireInteractiveDesktop(); return await CaptureAsync(args, token).ConfigureAwait(false);
+                case "screenshot.capture": RequireInteractiveDesktop(); return await CaptureAsync(args, token).ConfigureAwait(false);
                 case "window.listWindows": RequireInteractiveDesktop(); return Windows();
 
                 default:
@@ -332,23 +332,19 @@ namespace WindowsToolService
             }
         }
 
-        /// <summary>Captures a screenshot; uploads to storage and returns a URL, or inlines base64.</summary>
+        /// <summary>Captures a screenshot and uploads it to storage; always returns a URL, never inline bytes.</summary>
         private async Task<object> CaptureAsync(IDictionary<string, object> args, CancellationToken token)
         {
+            if (!_config.StorageEnabled)
+                throw new InvalidOperationException("Storage is not configured on this device. Configure storage to use screenshot.capture.");
+
             byte[] bytes;
             string mimeType, format;
             var result = CaptureCore(args, out bytes, out mimeType, out format);
-            if (_config.StorageEnabled)
-            {
-                var key = "screenshots/" + _config.DeviceId + "/" + Guid.NewGuid().ToString("N") + "." + (format == "jpeg" ? "jpg" : "png");
-                result["uploaded"] = true;
-                result["size"] = bytes.Length;
-                result["url"] = await new S3Presigner(_config).UploadAsync(key, bytes, mimeType, _config.StorageGetTtlSeconds, token).ConfigureAwait(false);
-            }
-            else
-            {
-                result["base64Data"] = Convert.ToBase64String(bytes);
-            }
+            var key = "screenshots/" + _config.DeviceId + "/" + Guid.NewGuid().ToString("N") + "." + (format == "jpeg" ? "jpg" : "png");
+            result["uploaded"] = true;
+            result["size"] = bytes.Length;
+            result["url"] = await new S3Presigner(_config).UploadAsync(key, bytes, mimeType, _config.StorageGetTtlSeconds, token).ConfigureAwait(false);
             return result;
         }
 

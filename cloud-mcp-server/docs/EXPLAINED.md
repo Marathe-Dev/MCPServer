@@ -87,7 +87,7 @@ Two things are "universal" here:
    | `tool_call` | cloud → device | `{ requestId, tool: RelayToolName, args }` — one specific action to perform |
    | `tool_result` | device → cloud | `{ requestId, ok, result }` or `{ requestId, ok: false, error }` |
 
-   `RelayToolName` (e.g. `"mouse.click"`, `"screenshot.capturePrimaryDisplay"`, `"cmd.execute"`) mirrors the local service's method names 1:1, so both ends can dispatch with a plain `switch`. The `requestId` (a UUID) is how `DeviceRegistry.sendRequest()` matches an outgoing `tool_call` to its eventual `tool_result`, including timing out if no response arrives.
+   `RelayToolName` (e.g. `"mouse.click"`, `"screenshot.capture"`, `"cmd.execute"`) mirrors the local service's method names 1:1, so both ends can dispatch with a plain `switch`. The `requestId` (a UUID) is how `DeviceRegistry.sendRequest()` matches an outgoing `tool_call` to its eventual `tool_result`, including timing out if no response arrives.
 
 ---
 

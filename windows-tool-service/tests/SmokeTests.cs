@@ -37,7 +37,12 @@ namespace WindowsToolService
                 }
                 if (args.Length == 2 && args[0] == "--relay")
                 {
-                    RelayAsync(args[1]).GetAwaiter().GetResult();
+                    RelayAsync(new AgentConfig { CloudUrl = args[1], DeviceId = "windows-relay-test", DeviceName = "Windows relay test" }).GetAwaiter().GetResult();
+                    return 0;
+                }
+                if (args.Length == 2 && args[0] == "--pipe")
+                {
+                    RelayAsync(new AgentConfig { ConnectionMode = "rpc", PipeName = args[1] }).GetAwaiter().GetResult();
                     return 0;
                 }
                 Assert(typeof(AgentConfig).Assembly.GetCustomAttributes(typeof(System.Runtime.Versioning.TargetFrameworkAttribute), false)
@@ -66,23 +71,24 @@ namespace WindowsToolService
                 new RelayClient(config, (tool, arguments, token) => Task.FromResult<object>(null), Console.WriteLine);
                 Assert(System.Net.ServicePointManager.SecurityProtocol == System.Net.SecurityProtocolType.Tls12, "relay enables TLS 1.2");
                 var fileArgs = new Dictionary<string, object> { { "path", "relative\\path.txt" } };
-                Reject(() => FileTools.Read(fileArgs), "relative file path rejection");
+                Reject(() => { string f, n; FileTools.ReadBytes(fileArgs, out f, out n); }, "relative file path rejection");
                 var missing = new Dictionary<string, object> { { "path", @"C:\Windows\this-file-does-not-exist.smoketest" } };
-                try { FileTools.Read(missing); throw new Exception("Expected file rejection."); }
+                try { string f, n; FileTools.ReadBytes(missing, out f, out n); throw new Exception("Expected file rejection."); }
                 catch (FileNotFoundException) { Assert(true, "missing file rejection"); }
                 var tempFile = Path.Combine(Path.GetTempPath(), "windows-tool-service-file-tools-" + Guid.NewGuid().ToString("N") + ".bin");
                 try
                 {
                     File.WriteAllBytes(tempFile, new byte[] { 0x4d, 0x43, 0x50, 0x00 });
-                    var read = (Dictionary<string, object>)FileTools.Read(new Dictionary<string, object> { { "path", tempFile } });
-                    Assert((bool)read["success"] && (int)read["size"] == 4 && (string)read["base64Data"] == "TUNQAA==", "FileTools reads a small file");
+                    string full, name;
+                    var data = FileTools.ReadBytes(new Dictionary<string, object> { { "path", tempFile } }, out full, out name);
+                    Assert(data.Length == 4 && data[0] == 0x4d && name == Path.GetFileName(tempFile), "FileTools reads a small file");
                 }
                 finally { try { File.Delete(tempFile); } catch { } }
                 var oversized = Path.Combine(Path.GetTempPath(), "windows-tool-service-oversize-" + Guid.NewGuid().ToString("N") + ".bin");
                 try
                 {
                     using (var stream = new FileStream(oversized, FileMode.CreateNew, FileAccess.Write)) { stream.SetLength(FileTools.MaxFileBytes + 1); }
-                    Reject(() => FileTools.Read(new Dictionary<string, object> { { "path", oversized } }), "10 MB file size rejection");
+                    Reject(() => { string f, n; FileTools.ReadBytes(new Dictionary<string, object> { { "path", oversized } }, out f, out n); }, "10 MB file size rejection");
                 }
                 finally { try { File.Delete(oversized); } catch { } }
 
@@ -90,14 +96,9 @@ namespace WindowsToolService
                 var router = new DesktopTools(new AgentConfig { CloudUrl = "ws://127.0.0.1:4000", DeviceId = "router", DeviceName = "router", EnableCmd = false });
                 try { router.CallAsync("cmd.execute", new Dictionary<string, object> { { "command", "echo hi" } }, CancellationToken.None).GetAwaiter().GetResult(); throw new Exception("Expected CMD rejection."); }
                 catch (InvalidOperationException) { Assert(true, "DesktopTools blocks CMD when disabled"); }
-                var routedFile = Path.Combine(Path.GetTempPath(), "windows-tool-service-routed-" + Guid.NewGuid().ToString("N") + ".bin");
-                try
-                {
-                    File.WriteAllBytes(routedFile, new byte[] { 0x4d, 0x43, 0x50, 0x00 });
-                    var routed = (Dictionary<string, object>)router.CallAsync("file.read", new Dictionary<string, object> { { "path", routedFile } }, CancellationToken.None).GetAwaiter().GetResult();
-                    Assert((bool)routed["success"] && (int)routed["size"] == 4, "DesktopTools routes file.read");
-                }
-                finally { try { File.Delete(routedFile); } catch { } }
+                // Storage gate is checked before the path even needs to exist.
+                try { router.CallAsync("file.read", new Dictionary<string, object> { { "path", @"C:\any.bin" } }, CancellationToken.None).GetAwaiter().GetResult(); throw new Exception("Expected storage-required rejection."); }
+                catch (InvalidOperationException) { Assert(true, "DesktopTools requires storage for file.read (no inline base64 backup)"); }
 
                 // Logger writes next to the exe and trims when it grows past 1 MB.
                 var logFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MCPToolService.Log");
@@ -116,8 +117,8 @@ namespace WindowsToolService
                 using (var bucket = new FakeBucket())
                 {
                     var storage = new AgentConfig { CloudUrl = "ws://127.0.0.1:4000", DeviceId = "dev", DeviceName = "dev",
-                        StorageEndpoint = bucket.Endpoint, StorageRegion = "us-east-1", StorageBucket = "b",
-                        StorageAccessKey = "AKID", StorageSecretKey = "secret", StorageGetTtlSeconds = 900 };
+                        E2StorageEndpoint = bucket.Endpoint, E2StorageRegion = "us-east-1", E2StorageBucket = "b",
+                        E2StorageAccessKey = "AKID", E2StorageSecretKey = "secret", StorageGetTtlSeconds = 900 };
                     Assert(storage.StorageEnabled, "storage enabled when fully configured");
 
                     var presigned = new S3Presigner(storage).Presign("GET", "a/b c.png", 900);
@@ -185,29 +186,32 @@ namespace WindowsToolService
             var windowJson = new JavaScriptSerializer().Serialize(windowList);
             Assert(windowList.Count == 0 || (windowJson.Contains("\"processId\"") && windowJson.Contains("\"displayIndex\"") && windowJson.Contains("\"isMinimized\"")),
                 "window list includes process, state and monitor fields");
-            var screenshot = (Dictionary<string, object>)(await desktop.CallAsync("screenshot.capturePrimaryDisplay", new Dictionary<string, object> { { "format", "png" } }, CancellationToken.None));
-            var image = Convert.FromBase64String((string)screenshot["base64Data"]);
-            Assert(image.Length > 8 && image[0] == 137 && image[1] == 80 && (int)screenshot["width"] > 0, "native PNG screenshot");
-            Assert(((System.Collections.IList)screenshot["displays"]).Count >= 1 && screenshot.ContainsKey("originX") && screenshot.ContainsKey("scale") && (string)screenshot["mimeType"] == "image/png",
-                "screenshot attaches display + coordinate metadata");
-            var jpegShot = (Dictionary<string, object>)(await desktop.CallAsync("screenshot.capturePrimaryDisplay", new Dictionary<string, object> { { "format", "jpeg" }, { "quality", 70 } }, CancellationToken.None));
-            var jpegBytes = Convert.FromBase64String((string)jpegShot["base64Data"]);
-            Assert(jpegBytes.Length > 3 && jpegBytes[0] == 0xFF && jpegBytes[1] == 0xD8 && (string)jpegShot["mimeType"] == "image/jpeg", "screenshot JPEG encoding");
-            var scaledShot = (Dictionary<string, object>)(await desktop.CallAsync("screenshot.capturePrimaryDisplay", new Dictionary<string, object> { { "format", "png" }, { "maxWidth", 320 } }, CancellationToken.None));
-            Assert((int)scaledShot["width"] <= 320 && Convert.ToDouble(scaledShot["scale"]) <= 1.0, "screenshot downscales to maxWidth");
+
+            // Screenshot requires storage; without it the call must fail instead of falling back to inline bytes.
+            try { await desktop.CallAsync("screenshot.capture", new Dictionary<string, object>(), CancellationToken.None); throw new Exception("Expected storage-required rejection."); }
+            catch (InvalidOperationException) { Assert(true, "screenshot requires storage (no inline base64 backup)"); }
 
             using (var bucket = new FakeBucket())
             {
                 var storage = new AgentConfig { CloudUrl = "ws://127.0.0.1:4000", DeviceId = "dev", DeviceName = "dev",
-                    StorageEndpoint = bucket.Endpoint, StorageRegion = "us-east-1", StorageBucket = "b",
-                    StorageAccessKey = "AKID", StorageSecretKey = "secret", StorageGetTtlSeconds = 900 };
+                    E2StorageEndpoint = bucket.Endpoint, E2StorageRegion = "us-east-1", E2StorageBucket = "b",
+                    E2StorageAccessKey = "AKID", E2StorageSecretKey = "secret", StorageGetTtlSeconds = 900 };
                 var uploadTools = new DesktopTools(storage);
-                var shot = (Dictionary<string, object>)(await uploadTools.CallAsync("screenshot.capturePrimaryDisplay", new Dictionary<string, object>(), CancellationToken.None));
-                Assert((bool)shot["uploaded"] && !shot.ContainsKey("base64Data") && ((string)shot["url"]).Contains("X-Amz-Signature"), "screenshot uploads and returns a URL");
                 using (var http = new System.Net.Http.HttpClient())
                 {
-                    var img = await http.GetByteArrayAsync((string)shot["url"]);
-                    Assert(img.Length > 8 && ((img[0] == 0xFF && img[1] == 0xD8) || (img[0] == 137 && img[1] == 80)), "uploaded screenshot downloads valid image bytes");
+                    var screenshot = (Dictionary<string, object>)(await uploadTools.CallAsync("screenshot.capture", new Dictionary<string, object> { { "format", "png" } }, CancellationToken.None));
+                    Assert((bool)screenshot["uploaded"] && !screenshot.ContainsKey("base64Data") && ((string)screenshot["url"]).Contains("X-Amz-Signature"), "screenshot uploads and returns a URL");
+                    var image = await http.GetByteArrayAsync((string)screenshot["url"]);
+                    Assert(image.Length > 8 && image[0] == 137 && image[1] == 80 && (int)screenshot["width"] > 0, "native PNG screenshot");
+                    Assert(((System.Collections.IList)screenshot["displays"]).Count >= 1 && screenshot.ContainsKey("originX") && screenshot.ContainsKey("scale") && (string)screenshot["mimeType"] == "image/png",
+                        "screenshot attaches display + coordinate metadata");
+
+                    var jpegShot = (Dictionary<string, object>)(await uploadTools.CallAsync("screenshot.capture", new Dictionary<string, object> { { "format", "jpeg" }, { "quality", 70 } }, CancellationToken.None));
+                    var jpegBytes = await http.GetByteArrayAsync((string)jpegShot["url"]);
+                    Assert(jpegBytes.Length > 3 && jpegBytes[0] == 0xFF && jpegBytes[1] == 0xD8 && (string)jpegShot["mimeType"] == "image/jpeg", "screenshot JPEG encoding");
+
+                    var scaledShot = (Dictionary<string, object>)(await uploadTools.CallAsync("screenshot.capture", new Dictionary<string, object> { { "format", "png" }, { "maxWidth", 320 } }, CancellationToken.None));
+                    Assert((int)scaledShot["width"] <= 320 && Convert.ToDouble(scaledShot["scale"]) <= 1.0, "screenshot downscales to maxWidth");
                 }
             }
 
@@ -236,11 +240,10 @@ namespace WindowsToolService
             catch (ArgumentException) { Assert(true, "WinPTY maxOutputChars capped at 400000"); }
         }
 
-        private static async Task RelayAsync(string url)
+        private static async Task RelayAsync(AgentConfig config)
         {
             using (var cancellation = new CancellationTokenSource(20000))
             {
-                var config = new AgentConfig { CloudUrl = url, DeviceId = "windows-relay-test", DeviceName = "Windows relay test" };
                 var relay = new RelayClient(config, async (tool, args, token) =>
                 {
                     if (tool == "test.echo") return (object)args;

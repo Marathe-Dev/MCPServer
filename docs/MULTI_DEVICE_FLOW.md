@@ -106,8 +106,8 @@ sequenceDiagram
 
     Agent->>MCP: tools/call "screenshot" {deviceId:"desk-1"}
     MCP->>Tool: handler({deviceId:"desk-1"})
-    Tool->>Relay: createServices("desk-1", registry).capturePrimaryDisplay()
-    Relay->>Reg: sendRequest("desk-1", "screenshot.capturePrimaryDisplay")
+    Tool->>Relay: createServices("desk-1", registry).capture()
+    Relay->>Reg: sendRequest("desk-1", "screenshot.capture")
     Reg->>Reg: new requestId, store {resolve, reject, timeout}
     Reg->>Link: send {type:"tool_call", requestId, tool, args}
     Link->>Local: forward over the desk-1 WebSocket

@@ -63,7 +63,7 @@ Message envelope over one WebSocket connection per device:
 
 `RelayToolName` mirrors the 4 `I*Service` method names 1:1 so dispatch is a plain switch on
 both ends: `"mouse.move" | "mouse.click" | "keyboard.typeText" | "keyboard.keyPress" |
-"screenshot.capturePrimaryDisplay" | "window.listWindows"`.
+"screenshot.capture" | "window.listWindows"`.
 
 Cloud server keeps, per process (in-memory, v1 = single instance, no horizontal scaling):
 - `Map<deviceId, WebSocket>` — connected local services.

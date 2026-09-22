@@ -39,7 +39,7 @@ function fakeToolResult(message) {
         case "keyboard.typeText":
         case "keyboard.keyPress":
             return ok({ success: true, backend: FAKE_BACKEND, timestamp });
-        case "screenshot.capturePrimaryDisplay": {
+        case "screenshot.capture": {
             const a = message.args;
             // A storage-configured agent uploads and returns a presigned URL instead of base64.
             if (a.target === "window") {

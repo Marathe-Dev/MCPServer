@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
-using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -26,44 +25,49 @@ namespace WindowsToolService
             this.status = status;
         }
 
+        /// <summary>Builds the transport for the configured mode; the message loop below is identical either way.</summary>
+        private IRelayChannel CreateChannel()
+        {
+            return config.EffectiveConnectionMode == "rpc"
+                ? (IRelayChannel)new PipeRelayChannel(config.PipeName)
+                : new WebSocketRelayChannel(config.CloudUrl);
+        }
+
         internal async Task RunAsync(CancellationToken cancellation)
         {
             var delay = 1000;
             while (!cancellation.IsCancellationRequested)
             {
-                using (var socket = new ClientWebSocket())
+                using (var channel = CreateChannel())
                 using (var connection = CancellationTokenSource.CreateLinkedTokenSource(cancellation))
                 {
                     Task activeCall = Task.FromResult(0);
                     try
                     {
                         status("Connecting");
-                        using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation))
-                        {
-                            timeout.CancelAfter(15000);
-                            await socket.ConnectAsync(new Uri(config.CloudUrl.TrimEnd('/') + "/device-link"), timeout.Token).ConfigureAwait(false);
-                        }
+                        await channel.ConnectAsync(cancellation).ConfigureAwait(false);
 
-                        // Send start Request for Registration of MCP tool Services
-                        await SendAsync(socket, new { type = "register", deviceId = config.DeviceId, deviceName = config.DeviceName, platform = "win32" }, connection.Token).ConfigureAwait(false);
+                        // RPCService/broker own device identity in "rpc" mode; only the direct cloud relay needs registration.
+                        if (config.EffectiveConnectionMode == "cloud")
+                            await SendAsync(channel, new { type = "register", deviceId = config.DeviceId, deviceName = config.DeviceName, platform = "win32" }, connection.Token).ConfigureAwait(false);
                         status("Connected");
                         delay = 1000;
 
-                        while (socket.State == WebSocketState.Open && !cancellation.IsCancellationRequested)
+                        while (!cancellation.IsCancellationRequested)
                         {
-                            var message = await ReceiveAsync(socket, connection.Token).ConfigureAwait(false);
+                            var message = await ReceiveAsync(channel, connection.Token).ConfigureAwait(false);
                             if (message == null) break;
                             Log.Write("MCP -> Received: " + new JavaScriptSerializer().Serialize(message));
                             var type = Arguments.Text(message, "type", 40);
                             if (type == "ping")
-                                await SendAsync(socket, new { type = "pong" }, connection.Token).ConfigureAwait(false);
+                                await SendAsync(channel, new { type = "pong" }, connection.Token).ConfigureAwait(false);
                             else if (type == "tool_call")
                             {
                                 var requestId = Arguments.Text(message, "requestId", 200);
                                 if (!actionGate.Wait(0))
-                                    await SendAsync(socket, new { type = "tool_result", requestId = requestId, ok = false, error = "Agent busy; retry after the current action completes." }, connection.Token).ConfigureAwait(false);
+                                    await SendAsync(channel, new { type = "tool_result", requestId = requestId, ok = false, error = "Agent busy; retry after the current action completes." }, connection.Token).ConfigureAwait(false);
                                 else
-                                    activeCall = Task.Run(() => HandleAsync(socket, message, requestId, connection.Token));
+                                    activeCall = Task.Run(() => HandleAsync(channel, message, requestId, connection.Token));
                             }
                         }
                     }
@@ -75,7 +79,6 @@ namespace WindowsToolService
                     finally
                     {
                         connection.Cancel();
-                        socket.Abort();
                         await activeCall.ConfigureAwait(false);
                     }
                 }
@@ -88,7 +91,7 @@ namespace WindowsToolService
             status("Stopped");
         }
 
-        private async Task HandleAsync(ClientWebSocket socket, IDictionary<string, object> message, string requestId, CancellationToken cancellation)
+        private async Task HandleAsync(IRelayChannel channel, IDictionary<string, object> message, string requestId, CancellationToken cancellation)
         {
             try
             {
@@ -104,13 +107,15 @@ namespace WindowsToolService
                     status("Running " + tool);
                     var result = await dispatch(tool, args, cancellation).ConfigureAwait(false); // dispatch = DesktopTools.CallAsync 
 
-                    response = new { type = "tool_result", requestId = requestId, ok = true, result = result };
+                    // The 500 KB cap is the cloud broker's limit; the local pipe to RPCService has no such ceiling.
+                    var capped = config.EffectiveConnectionMode == "cloud" ? CapResult(result, requestId) : null;
+                    response = capped ?? new { type = "tool_result", requestId = requestId, ok = true, result = result };
                 }
                 catch (Exception error)
                 {
                     response = new { type = "tool_result", requestId = requestId, ok = false, error = error.Message };
                 }
-                await SendAsync(socket, response, cancellation).ConfigureAwait(false);
+                await SendAsync(channel, response, cancellation).ConfigureAwait(false);
                 status("Connected");
             }
             catch (Exception error) { status("Result delivery failed: " + error.Message); }
@@ -133,35 +138,23 @@ namespace WindowsToolService
             };
         }
 
-        private async Task SendAsync(ClientWebSocket socket, object message, CancellationToken cancellation)
+        private async Task SendAsync(IRelayChannel channel, object message, CancellationToken cancellation)
         {
             var json = new JavaScriptSerializer { MaxJsonLength = 64 * 1024 * 1024 }.Serialize(message);
-            var bytes = Encoding.UTF8.GetBytes(json);
             Log.Write("MCP <- Sent: " + json);
             await sendGate.WaitAsync(cancellation).ConfigureAwait(false);
-            try { await socket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, cancellation).ConfigureAwait(false); }
+            try { await channel.SendAsync(json, cancellation).ConfigureAwait(false); }
             finally { sendGate.Release(); }
         }
 
-        private static async Task<Dictionary<string, object>> ReceiveAsync(ClientWebSocket socket, CancellationToken cancellation)
+        private static async Task<Dictionary<string, object>> ReceiveAsync(IRelayChannel channel, CancellationToken cancellation)
         {
-            var buffer = new byte[8192];
-            using (var stream = new MemoryStream())
-            {
-                WebSocketReceiveResult part;
-                do
-                {
-                    part = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), cancellation).ConfigureAwait(false);
-                    if (part.MessageType == WebSocketMessageType.Close) return null;
-                    if (part.MessageType != WebSocketMessageType.Text) throw new InvalidDataException("Expected a text relay message.");
-                    if (stream.Length + part.Count > 1024 * 1024) throw new InvalidDataException("Relay message exceeds 1 MiB.");
-                    stream.Write(buffer, 0, part.Count);
-                } while (!part.EndOfMessage);
-                var json = new UTF8Encoding(false, true).GetString(stream.ToArray());
-                var message = new JavaScriptSerializer { MaxJsonLength = 1024 * 1024, RecursionLimit = 32 }.Deserialize<Dictionary<string, object>>(json);
-                if (message == null) throw new InvalidDataException("Expected a relay object.");
-                return message;
-            }
+            var json = await channel.ReceiveAsync(cancellation).ConfigureAwait(false);
+            if (json == null) return null;
+            if (Encoding.UTF8.GetByteCount(json) > 1024 * 1024) throw new InvalidDataException("Relay message exceeds 1 MiB.");
+            var message = new JavaScriptSerializer { MaxJsonLength = 1024 * 1024, RecursionLimit = 32 }.Deserialize<Dictionary<string, object>>(json);
+            if (message == null) throw new InvalidDataException("Expected a relay object.");
+            return message;
         }
     }
 }

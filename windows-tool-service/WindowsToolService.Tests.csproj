@@ -34,6 +34,7 @@
     <Compile Include="FileTools.cs" />
     <Compile Include="S3Presigner.cs" />
     <Compile Include="Log.cs" />
+    <Compile Include="RelayChannel.cs" />
     <Compile Include="RelayClient.cs" />
     <Compile Include="WinPtyCommand.cs" />
     <Page Include="MainWindow.xaml"><Generator>MSBuild:Compile</Generator><SubType>Designer</SubType></Page>

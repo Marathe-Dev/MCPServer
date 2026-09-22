@@ -13,6 +13,19 @@ namespace WindowsToolService
         public bool EnableCmd { get; set; }
         public bool AutoConnectOnStartup { get; set; }
 
+        /// <summary>"cloud" = direct WebSocket to the Cloud MCP Server (testing); "rpc" = local named pipe to RPCService (production).</summary>
+        public string ConnectionMode { get; set; }
+
+        /// <summary>Local named pipe name used to reach RPCService when ConnectionMode is "rpc".</summary>
+        public string PipeName { get; set; }
+
+        /// <summary>ConnectionMode, defaulting to "cloud" for configs saved before this field existed.</summary>
+        [ScriptIgnore]
+        internal string EffectiveConnectionMode
+        {
+            get { return string.IsNullOrEmpty(ConnectionMode) ? "cloud" : ConnectionMode; }
+        }
+
         // Storage endpoint/region/bucket may live in config.json; access + secret keys come from env only.
         public string E2StorageEndpoint { get; set; }
         public string E2StorageRegion { get; set; }
@@ -47,6 +60,9 @@ namespace WindowsToolService
             if (config == null) 
                 throw new InvalidDataException("Invalid agent configuration.");
 
+            if (string.IsNullOrEmpty(config.ConnectionMode)) config.ConnectionMode = "cloud"; // back-compat: configs saved before this field existed
+            if (string.IsNullOrEmpty(config.PipeName)) config.PipeName = "RPCService.MCP.Relay";
+
             // Environment.GetEnvironmentVariable("CLOUD_URL") - To Read from the env variable
 
             config.CloudUrl = config.CloudUrl; 
@@ -67,21 +83,30 @@ namespace WindowsToolService
 
         internal void Validate()
         {
-            Uri endpoint;
-            if (!Uri.TryCreate(CloudUrl, UriKind.Absolute, out endpoint) ||
-                (endpoint.Scheme != "ws" && endpoint.Scheme != "wss") ||
-                !string.IsNullOrEmpty(endpoint.UserInfo) || !string.IsNullOrEmpty(endpoint.Query) || !string.IsNullOrEmpty(endpoint.Fragment))
-                throw new ArgumentException("Cloud URL must be a ws:// or wss:// base URL without credentials, query or fragment.");
-            
-            if (endpoint.Scheme == "ws" && !endpoint.IsLoopback)
-                throw new ArgumentException("Remote connections require wss://. Plain ws:// is allowed only on loopback.");
-            
-            if (string.IsNullOrWhiteSpace(DeviceId) || DeviceId.Length > 200)
-                throw new ArgumentException("Device ID is required (maximum 200 characters).");
-            
-            if (string.IsNullOrWhiteSpace(DeviceName)) 
-                throw new ArgumentException("Device name is required.");
-            
+            if (EffectiveConnectionMode != "cloud" && EffectiveConnectionMode != "rpc")
+                throw new ArgumentException("Connection mode must be \"cloud\" or \"rpc\".");
+
+            if (EffectiveConnectionMode == "cloud")
+            {
+                Uri endpoint;
+                if (!Uri.TryCreate(CloudUrl, UriKind.Absolute, out endpoint) ||
+                    (endpoint.Scheme != "ws" && endpoint.Scheme != "wss") ||
+                    !string.IsNullOrEmpty(endpoint.UserInfo) || !string.IsNullOrEmpty(endpoint.Query) || !string.IsNullOrEmpty(endpoint.Fragment))
+                    throw new ArgumentException("Cloud URL must be a ws:// or wss:// base URL without credentials, query or fragment.");
+
+                if (endpoint.Scheme == "ws" && !endpoint.IsLoopback)
+                    throw new ArgumentException("Remote connections require wss://. Plain ws:// is allowed only on loopback.");
+
+                // RPCService/broker own device identity in "rpc" mode, so only the cloud relay requires it.
+                if (string.IsNullOrWhiteSpace(DeviceId) || DeviceId.Length > 200)
+                    throw new ArgumentException("Device ID is required (maximum 200 characters).");
+
+                if (string.IsNullOrWhiteSpace(DeviceName))
+                    throw new ArgumentException("Device name is required.");
+            }
+            else if (string.IsNullOrWhiteSpace(PipeName) || PipeName.Length > 200 || PipeName.IndexOfAny(new[] { '\\', '/' }) >= 0)
+                throw new ArgumentException("Pipe name is required (maximum 200 characters, no path separators).");
+
             if (!string.IsNullOrEmpty(E2StorageEndpoint))
             {
                 Uri storage;

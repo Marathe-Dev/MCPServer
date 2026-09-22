@@ -11,7 +11,7 @@ export type RelayToolName =
   | "mouse.drag"
   | "keyboard.typeText"
   | "keyboard.keyPress"
-  | "screenshot.capturePrimaryDisplay"
+  | "screenshot.capture"
   | "window.listWindows"
   | "cmd.execute"
   | "file.read";

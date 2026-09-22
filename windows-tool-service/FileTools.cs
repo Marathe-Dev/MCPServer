@@ -10,16 +10,6 @@ namespace WindowsToolService
     {
         internal const long MaxFileBytes = 10L * 1024 * 1024;
 
-        /// <summary>Reads a file and returns it inline as base64.</summary>
-        internal static object Read(IDictionary<string, object> args)
-        {
-            string full, name;
-            var data = ReadBytes(args, out full, out name);
-            var result = Envelope(full, name, data.Length);
-            result["base64Data"] = Convert.ToBase64String(data);
-            return result;
-        }
-
         /// <summary>Reads a file, uploads it to storage, and returns a presigned download URL.</summary>
         internal static async Task<object> UploadAsync(IDictionary<string, object> args, AgentConfig config, CancellationToken token)
         {
@@ -49,7 +39,8 @@ namespace WindowsToolService
             };
         }
 
-        private static byte[] ReadBytes(IDictionary<string, object> args, out string full, out string name)
+        /// <summary>internal (not private) so tests can exercise path/size validation without a storage backend.</summary>
+        internal static byte[] ReadBytes(IDictionary<string, object> args, out string full, out string name)
         {
             var path = Arguments.Text(args, "path", 32767);
             if (path.IndexOfAny(Path.GetInvalidPathChars()) >= 0)

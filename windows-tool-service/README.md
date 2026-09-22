@@ -22,7 +22,7 @@ This is a normal user-session EXE. No Windows service or installation scripts ar
 | `RelayClient.cs` | WebSocket connection to the cloud server: register, ping/pong, reconnect backoff |
 | `DesktopTools.cs` | Single tool dispatcher — one `CallAsync` switch routes mouse/keyboard/screenshot/window input plus CMD and file reads |
 | `WinPtyCommand.cs` | Runs one CMD command per call via WinPTY, with timeout and output limits |
-| `FileTools.cs` | Reads a file (absolute path) as base64, capped at 10 MB |
+| `FileTools.cs` | Reads a file (absolute path, capped at 10 MB) and uploads it to storage, returning a presigned URL |
 
 ## Requirements
 
@@ -110,10 +110,10 @@ owns launch/relaunch policy. Previously installed services are not automatically
 | --- | --- | --- |
 | `mouse` | `mouse.move` / `mouse.click` / `mouse.scroll` / `mouse.drag` | `action`; `x`, `y`; `button`, `clickType`; `toX`, `toY` (drag); `amount`, `axis` (scroll) |
 | `keyboard` | `keyboard.typeText` / `keyboard.keyPress` | `action` (`type`/`press`); `text` or `keys` (e.g. `["ctrl", "s"]`) |
-| `screenshot` | `screenshot.capturePrimaryDisplay` | `target` (`primary`/`virtual`/`display`/`window`), `displayIndex`, `windowTitle`, `format` (`auto`/`png`/`jpeg`), `quality`, `maxWidth` |
+| `screenshot` | `screenshot.capture` | `target` (`primary`/`virtual`/`display`/`window`), `displayIndex`, `windowTitle`, `format` (`auto`/`png`/`jpeg`), `quality`, `maxWidth` |
 | `get_window_list` | `window.listWindows` | — (visible windows with geometry, focus, `processName`/`processId`, min/max state, `displayIndex`; tool windows filtered) |
 | `cmd` | `cmd.execute` | `command`, optional `workingDirectory`, `timeoutMs`, `maxOutputChars` |
-| `get_file` | `file.read` | `path` (absolute); returns `base64Data`, `name`, `size` — files over 10 MB are rejected |
+| `get_file` | `file.read` | `path` (absolute); returns `url`, `name`, `size` — requires storage configured (no inline base64 fallback), files over 10 MB are rejected |
 
 Every relay action is dispatched by one `DesktopTools.CallAsync` switch. Results carry `success`, `backend` (`win32` or `winpty`), and an ISO `timestamp`. Key/mouse-button names match the existing TypeScript agent. The cloud server needs its own small rebuild to pick up the `cmd` and `get_file` tools:
 
@@ -139,15 +139,16 @@ Every capture attaches coordinate metadata so input lands correctly on multi-mon
 `realX = originX + pixelX / scale` (and likewise for Y), then pass it to `mouse_move`/`mouse_click`.
 Mixed-DPI secondary monitors may capture scaled under the current System-DPI setting.
 
-### Presigned file uploads (storage)
+### Presigned file uploads (storage — required)
 
-When S3-compatible storage (IDrive e2) is configured, the agent uploads screenshots and
-`get_file` results **directly to the bucket** and returns a short-lived **presigned URL**
-instead of base64 — keeping every relay message small (needed when a broker caps message size,
-e.g. 500 KB). The AI agent downloads the URL with **no credentials**: the signature and expiry
-are embedded in the query string, the bucket stays private, and the link is scoped to that one
-object until it expires (default 15 minutes). Without storage configured, both tools fall back
-to inline base64.
+`screenshot` and `get_file` always upload directly to S3-compatible storage (IDrive e2) and
+return a short-lived **presigned URL** — there is no inline-base64 fallback, so every relay
+message stays small (needed when a broker caps message size, e.g. 500 KB) and no file bytes
+ever pass through the relay/broker. The AI agent downloads the URL with **no credentials**: the
+signature and expiry are embedded in the query string, the bucket stays private, and the link is
+scoped to that one object until it expires (default 15 minutes). **Storage must be configured**
+for these two tools to work at all — without it, calls fail with a clear
+"Storage is not configured on this device" error instead of falling back to inline bytes.
 
 Configure with environment variables. The access/secret keys are read from the environment
 only and are never written to `config.json`:
@@ -196,6 +197,7 @@ Only a single command line is accepted (use `&`/`&&` to chain); there's no inter
 .\windows-tool-service\build.ps1 -Configuration Debug -Platform AnyCPU
 .\windows-tool-service\build.ps1 -NativeTest  # + real WinPTY/WPF checks (needs an unlocked desktop)
 node --test windows-tool-service\tests\relay.test.mjs   # live C# client vs. a real WebSocket
+node --test windows-tool-service\tests\relay-pipe.test.mjs   # live C# client vs. a local named pipe (RPC mode)
 npm --prefix cloud-mcp-server test            # cloud relay + MCP tool tests
 ```
 

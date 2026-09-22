@@ -59,9 +59,12 @@ namespace WindowsToolService
                 cloud.Text = _config.CloudUrl;
                 deviceId.Password = _config.DeviceId;
                 name.Text = _config.DeviceName;
+                pipeName.Text = _config.PipeName;
                 enableCmd.IsChecked = _config.EnableCmd;
                 autoConnect.IsChecked = _config.AutoConnectOnStartup;
+                if (_config.EffectiveConnectionMode == "rpc") modeRpc.IsChecked = true; else modeCloud.IsChecked = true;
                 _initialized = true;
+                ApplyModeEnablement(connect.IsEnabled);
 
                 Log.Write("Settings loaded for device \"" + _config.DeviceName + "\".");
                 ShowForeground();
@@ -80,6 +83,23 @@ namespace WindowsToolService
         private async void Connect_Click(object sender, RoutedEventArgs e) => await ConnectAsync();
 
         private async void Disconnect_Click(object sender, RoutedEventArgs e) => await StopAsync();
+
+        /// <summary>Toggles the Cloud URL vs. Pipe name field to match the selected connection mode.</summary>
+        private void ConnectionMode_Checked(object sender, RoutedEventArgs e)
+        {
+            if (!_initialized) return;
+            ApplyModeEnablement(connect.IsEnabled);
+        }
+
+        /// <summary>Enables only the fields for the active connection mode, and only while stopped.</summary>
+        private void ApplyModeEnablement(bool enabled)
+        {
+            var cloudMode = modeCloud.IsChecked == true;
+            cloud.IsEnabled = enabled && cloudMode;
+            deviceId.IsEnabled = enabled && cloudMode; // identity only matters to the direct cloud relay
+            name.IsEnabled = enabled && cloudMode;
+            pipeName.IsEnabled = enabled && !cloudMode;
+        }
 
         /// <summary>Warns before enabling remote CMD; reverts the checkbox if declined.</summary>
         private void EnableCmd_Checked(object sender, RoutedEventArgs e)
@@ -111,6 +131,8 @@ namespace WindowsToolService
                 _config.CloudUrl = cloud.Text.Trim();
                 _config.DeviceId = deviceId.Password.Trim();
                 _config.DeviceName = name.Text.Trim();
+                _config.PipeName = pipeName.Text.Trim();
+                _config.ConnectionMode = modeRpc.IsChecked == true ? "rpc" : "cloud";
                 _config.EnableCmd = enableCmd.IsChecked == true;
                 _config.AutoConnectOnStartup = autoConnect.IsChecked == true;
                 _config.Save();
@@ -122,7 +144,9 @@ namespace WindowsToolService
                 var tools = new DesktopTools(_config);
                 var relay = new RelayClient(_config, tools.CallAsync, SetStatus);
 
-                Log.Write("Connecting to " + _config.CloudUrl + " as device \"" + _config.DeviceId + "\".");
+                var target = _config.EffectiveConnectionMode == "rpc" ? "pipe \"" + _config.PipeName + "\"" : _config.CloudUrl;
+                var identity = string.IsNullOrEmpty(_config.DeviceId) ? "" : " as device \"" + _config.DeviceId + "\"";
+                Log.Write("Connecting to " + target + identity + ".");
                 SetControls(stopped: false);
                 _running = Task.Run(() => relay.RunAsync(_cancellation.Token));
             }
@@ -173,9 +197,11 @@ namespace WindowsToolService
         /// <summary>Enables the settings + Connect controls when stopped, Disconnect when running.</summary>
         private void SetControls(bool stopped)
         {
-            cloud.IsEnabled = deviceId.IsEnabled = name.IsEnabled =
-                enableCmd.IsEnabled = autoConnect.IsEnabled = connect.IsEnabled = stopped && !_closing;
+            var enabled = stopped && !_closing;
+            enableCmd.IsEnabled = autoConnect.IsEnabled =
+                connect.IsEnabled = modeCloud.IsEnabled = modeRpc.IsEnabled = enabled;
             disconnect.IsEnabled = !stopped && !_closing;
+            ApplyModeEnablement(enabled); // owns cloud/deviceId/name/pipeName per mode
         }
 
         /// <summary>Shows the latest status and appends a timestamped line to the bounded log.</summary>

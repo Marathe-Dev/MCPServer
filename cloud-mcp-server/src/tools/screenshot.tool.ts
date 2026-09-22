@@ -31,7 +31,7 @@ export function registerScreenshotTool(
     async ({ deviceId, ...args }) => {
       const result = await deviceRegistry.sendRequest<ScreenshotResult>(
         deviceId,
-        "screenshot.capturePrimaryDisplay",
+        "screenshot.capture",
         args,
         60000,
       );
