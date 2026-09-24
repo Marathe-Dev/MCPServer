@@ -62,13 +62,20 @@ namespace WindowsToolService
                 pipeName.Text = _config.PipeName;
                 enableCmd.IsChecked = _config.EnableCmd;
                 autoConnect.IsChecked = _config.AutoConnectOnStartup;
-                if (_config.EffectiveConnectionMode == "rpc") modeRpc.IsChecked = true; else modeCloud.IsChecked = true;
+
+                if (_config.EffectiveConnectionMode == "rpc") 
+                    modeRpc.IsChecked = true; 
+                else 
+                    modeCloud.IsChecked = true;
+
                 _initialized = true;
                 ApplyModeEnablement(connect.IsEnabled);
 
                 Log.Write("Settings loaded for device \"" + _config.DeviceName + "\".");
                 ShowForeground();
-                if (_config.AutoConnectOnStartup) await ConnectAsync();
+
+                if (_config.AutoConnectOnStartup) 
+                    await ConnectAsync();
             }
             catch (Exception error)
             {
@@ -124,7 +131,8 @@ namespace WindowsToolService
         /// <summary>Saves the settings and starts the relay loop on a background task.</summary>
         private Task ConnectAsync()
         {
-            if (!_initialized || _closing || _running != null) return Task.FromResult(0);
+            if (!_initialized || _closing || _running != null) 
+                return Task.FromResult(0);
 
             try
             {

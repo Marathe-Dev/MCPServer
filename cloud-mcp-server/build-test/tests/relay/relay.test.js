@@ -41,18 +41,6 @@ function fakeToolResult(message) {
             return ok({ success: true, backend: FAKE_BACKEND, timestamp });
         case "screenshot.capture": {
             const a = message.args;
-            // A storage-configured agent uploads and returns a presigned URL instead of base64.
-            if (a.target === "window") {
-                return ok({
-                    success: true, format: "png", mimeType: "image/png", uploaded: true,
-                    url: "https://bucket.example/screenshots/x.png?X-Amz-Signature=demo",
-                    width: 800, height: 600, originalWidth: 800, originalHeight: 600, scale: 1,
-                    originX: 0, originY: 0,
-                    displays: [{ index: 0, x: 0, y: 0, width: 1920, height: 1080, isPrimary: true }],
-                    virtualBounds: { x: 0, y: 0, width: 1920, height: 1080 }, cursor: { x: 0, y: 0 },
-                    backend: FAKE_BACKEND, timestamp,
-                });
-            }
             const jpeg = a.format === "jpeg";
             return ok({
                 success: true,
@@ -292,17 +280,6 @@ test("screenshot relays an image with coordinate metadata and honours format", a
         const jpeg = await client.callTool({ name: "screenshot", arguments: { deviceId: DEVICE_ID, format: "jpeg" } });
         const [jpegImage] = jpeg.content;
         assert.equal(jpegImage.mimeType, "image/jpeg");
-    });
-});
-test("screenshot forwards a presigned URL with no image bytes when the agent uploads", async () => {
-    await withRegisteredDevice(async (client) => {
-        const res = await client.callTool({ name: "screenshot", arguments: { deviceId: DEVICE_ID, target: "window", windowTitle: "x" } });
-        const content = res.content;
-        assert.ok(!content.some((c) => c.type === "image"));
-        const text = content.find((c) => c.type === "text");
-        const parsed = JSON.parse(text.text);
-        assert.ok(typeof parsed.url === "string" && parsed.url.includes("X-Amz-Signature"));
-        assert.equal(parsed.base64Data, undefined);
     });
 });
 test("get_window_list relays the fake device's window list", async () => {

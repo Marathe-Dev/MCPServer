@@ -60,8 +60,11 @@ namespace WindowsToolService
             if (config == null) 
                 throw new InvalidDataException("Invalid agent configuration.");
 
-            if (string.IsNullOrEmpty(config.ConnectionMode)) config.ConnectionMode = "cloud"; // back-compat: configs saved before this field existed
-            if (string.IsNullOrEmpty(config.PipeName)) config.PipeName = "RPCService.MCP.Relay";
+            if (string.IsNullOrEmpty(config.ConnectionMode)) 
+                config.ConnectionMode = "cloud"; // back-compat: configs saved before this field existed
+
+            if (string.IsNullOrEmpty(config.PipeName)) 
+                config.PipeName = "RPCService.MCP.Relay";
 
             // Environment.GetEnvironmentVariable("CLOUD_URL") - To Read from the env variable
 

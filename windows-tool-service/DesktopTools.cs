@@ -58,7 +58,7 @@ namespace WindowsToolService
                 case "mouse.drag": RequireInteractiveDesktop(); return Drag(args);
                 case "keyboard.typeText": RequireInteractiveDesktop(); return TypeText(args);
                 case "keyboard.keyPress": RequireInteractiveDesktop(); return Press(args);
-                case "screenshot.capture": RequireInteractiveDesktop(); return await CaptureAsync(args, token).ConfigureAwait(false);
+                case "screenshot.capture": RequireInteractiveDesktop(); return Capture(args);
                 case "window.listWindows": RequireInteractiveDesktop(); return Windows();
 
                 default:
@@ -249,8 +249,8 @@ namespace WindowsToolService
 
         private const long AutoPngMaxPixels = 1000000;
 
-        /// <summary>Captures a target region and its metadata; encoded bytes come back via out params (no base64).</summary>
-        private static Dictionary<string, object> CaptureCore(IDictionary<string, object> args, out byte[] bytes, out string mimeType, out string format)
+        /// <summary>Captures a target region as PNG or JPEG (base64) with coordinate metadata.</summary>
+        private static object Capture(IDictionary<string, object> args)
         {
             var target = Arguments.Choice(args, "target", "primary", "primary", "virtual", "display", "window");
             Rectangle source;
@@ -302,6 +302,7 @@ namespace WindowsToolService
 
                     // Auto keeps small/text frames as lossless PNG and switches large frames to JPEG to cut size.
                     var jpeg = requestedFormat == "jpeg" || (requestedFormat == "auto" && (long)encoded.Width * encoded.Height > AutoPngMaxPixels);
+                    byte[] bytes;
                     using (var stream = new MemoryStream())
                     {
                         if (jpeg) SaveJpeg(encoded, stream, quality);
@@ -309,11 +310,10 @@ namespace WindowsToolService
                         bytes = stream.ToArray();
                     }
 
-                    format = jpeg ? "jpeg" : "png";
-                    mimeType = jpeg ? "image/jpeg" : "image/png";
                     var result = Result();
-                    result["format"] = format;
-                    result["mimeType"] = mimeType;
+                    result["format"] = jpeg ? "jpeg" : "png";
+                    result["mimeType"] = jpeg ? "image/jpeg" : "image/png";
+                    result["base64Data"] = Convert.ToBase64String(bytes);
                     result["width"] = encoded.Width;
                     result["height"] = encoded.Height;
                     result["originalWidth"] = source.Width;
@@ -333,20 +333,20 @@ namespace WindowsToolService
         }
 
         /// <summary>Captures a screenshot and uploads it to storage; always returns a URL, never inline bytes.</summary>
-        private async Task<object> CaptureAsync(IDictionary<string, object> args, CancellationToken token)
-        {
-            if (!_config.StorageEnabled)
-                throw new InvalidOperationException("Storage is not configured on this device. Configure storage to use screenshot.capture.");
+        //private async Task<object> CaptureAsync(IDictionary<string, object> args, CancellationToken token)
+        //{
+        //    if (!_config.StorageEnabled)
+        //        throw new InvalidOperationException("Storage is not configured on this device. Configure storage to use screenshot.capture.");
 
-            byte[] bytes;
-            string mimeType, format;
-            var result = CaptureCore(args, out bytes, out mimeType, out format);
-            var key = "screenshots/" + _config.DeviceId + "/" + Guid.NewGuid().ToString("N") + "." + (format == "jpeg" ? "jpg" : "png");
-            result["uploaded"] = true;
-            result["size"] = bytes.Length;
-            result["url"] = await new S3Presigner(_config).UploadAsync(key, bytes, mimeType, _config.StorageGetTtlSeconds, token).ConfigureAwait(false);
-            return result;
-        }
+        //    byte[] bytes;
+        //    string mimeType, format;
+        //    var result = CaptureCore(args, out bytes, out mimeType, out format);
+        //    var key = "screenshots/" + _config.DeviceId + "/" + Guid.NewGuid().ToString("N") + "." + (format == "jpeg" ? "jpg" : "png");
+        //    result["uploaded"] = true;
+        //    result["size"] = bytes.Length;
+        //    result["url"] = await new S3Presigner(_config).UploadAsync(key, bytes, mimeType, _config.StorageGetTtlSeconds, token).ConfigureAwait(false);
+        //    return result;
+        //}
 
         /// <summary>Metadata for every display so the agent can map screenshot pixels to input coordinates.</summary>
         private static List<object> Displays()

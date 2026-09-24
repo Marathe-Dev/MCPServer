@@ -36,8 +36,7 @@ export function registerScreenshotTool(
         60000,
       );
       const { base64Data, ...meta } = result;
-      // Uploaded frames come back as a presigned URL (no bytes on the wire).
-      if (result.url || !base64Data) {
+      if (!base64Data) {
         return { content: [{ type: "text", text: JSON.stringify(meta) }] };
       }
       return {
