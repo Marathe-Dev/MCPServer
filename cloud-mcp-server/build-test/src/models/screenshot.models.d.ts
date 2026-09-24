@@ -21,6 +21,7 @@ export interface ScreenshotResult {
         width: number;
         height: number;
         isPrimary: boolean;
+        dpi?: number;
     }>;
     virtualBounds?: {
         x: number;

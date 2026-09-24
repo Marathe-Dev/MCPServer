@@ -193,6 +193,7 @@ namespace WindowsToolService
             Assert(image.Length > 8 && image[0] == 137 && image[1] == 80 && (int)screenshot["width"] > 0, "native PNG screenshot");
             Assert(((System.Collections.IList)screenshot["displays"]).Count >= 1 && screenshot.ContainsKey("originX") && screenshot.ContainsKey("scale") && (string)screenshot["mimeType"] == "image/png",
                 "screenshot attaches display + coordinate metadata");
+            Assert(new JavaScriptSerializer().Serialize(screenshot["displays"]).Contains("\"dpi\":"), "screenshot displays[] report per-monitor dpi");
 
             var jpegShot = (Dictionary<string, object>)(await desktop.CallAsync("screenshot.capture", new Dictionary<string, object> { { "format", "jpeg" }, { "quality", 70 } }, CancellationToken.None));
             var jpegBytes = Convert.FromBase64String((string)jpegShot["base64Data"]);

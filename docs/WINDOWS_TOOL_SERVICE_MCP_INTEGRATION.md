@@ -156,7 +156,7 @@ Press a key combination together (e.g. Ctrl+S), then release in reverse order.
 **result:** *(envelope only)*
 
 ### 4.7 `screenshot.capture`
-Capture a screen region. The image is returned **inline as base64** (`base64Data`) — no storage or upload is involved.
+Capture a screen region. The image is returned **inline as base64** (`base64Data`) — no storage or upload is involved. The agent is Per-Monitor-V2 DPI aware, so this pixel space always matches `mouse.move`/`mouse.click` input coordinates exactly, including across monitors with different scale factors.
 
 | args | type | required | notes |
 |---|---|---|---|
@@ -173,13 +173,13 @@ Capture a screen region. The image is returned **inline as base64** (`base64Data
   "format": "png|jpeg", "mimeType": "image/png|image/jpeg",
   "width": 0, "height": 0, "originalWidth": 0, "originalHeight": 0, "scale": 1.0,
   "originX": 0, "originY": 0,
-  "displays": [{ "index": 0, "x": 0, "y": 0, "width": 0, "height": 0, "isPrimary": true }],
+  "displays": [{ "index": 0, "x": 0, "y": 0, "width": 0, "height": 0, "isPrimary": true, "dpi": 96 }],
   "virtualBounds": { "x": 0, "y": 0, "width": 0, "height": 0 },
   "cursor": { "x": 0, "y": 0 },
   "base64Data": "<base64-encoded PNG/JPEG bytes>"
 }
 ```
-> Map a screenshot pixel back to a real screen coordinate as `originX + pixelX / scale`. The image bytes come back inline in `base64Data` — decode it against `mimeType`. Screenshots do not use storage, so no configuration is required.
+> Map a screenshot pixel back to a real screen coordinate as `originX + pixelX / scale`. The image bytes come back inline in `base64Data` — decode it against `mimeType`, and it already has the system cursor drawn on it (no separate confirmation call needed). `displays[].dpi` is diagnostic only — coordinates are already consistent, you don't need to apply it yourself. Screenshots do not use storage, so no configuration is required.
 
 ### 4.8 `window.listWindows`
 List visible top-level windows.

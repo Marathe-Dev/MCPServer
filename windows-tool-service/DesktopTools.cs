@@ -279,7 +279,10 @@ namespace WindowsToolService
             using (var full = new Bitmap(source.Width, source.Height, PixelFormat.Format24bppRgb))
             {
                 using (var graphics = Graphics.FromImage(full))
+                {
                     graphics.CopyFromScreen(source.Location, Point.Empty, source.Size, CopyPixelOperation.SourceCopy);
+                    DrawCursor(graphics, source);
+                }
 
                 var scale = 1.0;
                 var encoded = full;
@@ -348,6 +351,19 @@ namespace WindowsToolService
         //    return result;
         //}
 
+        /// <summary>Draws the real system cursor onto the capture so the agent can confirm pointer position visually.</summary>
+        private static void DrawCursor(Graphics graphics, Rectangle source)
+        {
+            CursorInfo info;
+            info.Size = Marshal.SizeOf(typeof(CursorInfo));
+            if (!GetCursorInfo(out info) || info.Flags != CURSOR_SHOWING) return;
+            if (!source.Contains(info.ScreenPos)) return;
+
+            var hdc = graphics.GetHdc();
+            try { DrawIconEx(hdc, info.ScreenPos.X - source.X, info.ScreenPos.Y - source.Y, info.Cursor, 0, 0, 0, IntPtr.Zero, DI_NORMAL); }
+            finally { graphics.ReleaseHdc(hdc); }
+        }
+
         /// <summary>Metadata for every display so the agent can map screenshot pixels to input coordinates.</summary>
         private static List<object> Displays()
         {
@@ -356,9 +372,18 @@ namespace WindowsToolService
             for (var i = 0; i < screens.Length; i++)
             {
                 var b = screens[i].Bounds;
-                displays.Add(new { index = i, x = b.X, y = b.Y, width = b.Width, height = b.Height, isPrimary = screens[i].Primary });
+                displays.Add(new { index = i, x = b.X, y = b.Y, width = b.Width, height = b.Height, isPrimary = screens[i].Primary, dpi = MonitorDpi(b) });
             }
             return displays;
+        }
+
+        /// <summary>Effective DPI for the monitor covering this rect; diagnostic only now that PerMonitorV2 keeps coordinates consistent.</summary>
+        private static int MonitorDpi(Rectangle bounds)
+        {
+            var rect = new Rect { Left = bounds.Left, Top = bounds.Top, Right = bounds.Right, Bottom = bounds.Bottom };
+            var monitor = MonitorFromRect(ref rect, MONITOR_DEFAULTTONEAREST);
+            uint dpiX, dpiY;
+            return GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, out dpiX, out dpiY) == 0 ? (int)dpiX : 96;
         }
 
         /// <summary>Encodes a bitmap as JPEG at the given quality using the built-in GDI+ encoder.</summary>
@@ -520,7 +545,13 @@ namespace WindowsToolService
             public UIntPtr ExtraInfo;
         }
         [StructLayout(LayoutKind.Sequential)] private struct Rect { public int Left, Top, Right, Bottom; }
+        [StructLayout(LayoutKind.Sequential)] private struct CursorInfo { public int Size; public int Flags; public IntPtr Cursor; public Point ScreenPos; }
         private delegate bool EnumWindow(IntPtr handle, IntPtr parameter);
+
+        private const int CURSOR_SHOWING = 0x1;
+        private const int DI_NORMAL = 0x3;
+        private const int MONITOR_DEFAULTTONEAREST = 2;
+        private const int MDT_EFFECTIVE_DPI = 0;
 
         [DllImport("user32.dll", SetLastError = true)] private static extern bool SetCursorPos(int x, int y);
         [DllImport("user32.dll", SetLastError = true)] private static extern uint SendInput(uint count, Input[] inputs, int size);
@@ -538,5 +569,9 @@ namespace WindowsToolService
         [DllImport("user32.dll", SetLastError = true)] private static extern IntPtr OpenInputDesktop(uint flags, bool inherit, uint access);
         [DllImport("user32.dll")] private static extern bool SwitchDesktop(IntPtr desktop);
         [DllImport("user32.dll")] private static extern bool CloseDesktop(IntPtr desktop);
+        [DllImport("user32.dll")] private static extern bool GetCursorInfo(out CursorInfo info);
+        [DllImport("user32.dll")] private static extern bool DrawIconEx(IntPtr hdc, int x, int y, IntPtr icon, int width, int height, int frame, IntPtr flickerFreeDraw, int flags);
+        [DllImport("user32.dll")] private static extern IntPtr MonitorFromRect(ref Rect rect, int flags);
+        [DllImport("shcore.dll")] private static extern int GetDpiForMonitor(IntPtr monitor, int dpiType, out uint dpiX, out uint dpiY);
     }
 }

@@ -14,7 +14,7 @@ export interface ScreenshotResult {
   scale?: number;
   originX?: number;
   originY?: number;
-  displays?: Array<{ index: number; x: number; y: number; width: number; height: number; isPrimary: boolean }>;
+  displays?: Array<{ index: number; x: number; y: number; width: number; height: number; isPrimary: boolean; dpi?: number }>;
   virtualBounds?: { x: number; y: number; width: number; height: number };
   cursor?: { x: number; y: number };
   backend: string;
