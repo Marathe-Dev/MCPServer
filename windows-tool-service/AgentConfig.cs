@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using System.Web.Script.Serialization;
 
 namespace WindowsToolService
@@ -122,7 +123,38 @@ namespace WindowsToolService
         {
             Validate();
             Directory.CreateDirectory(Path.GetDirectoryName(ConfigPath));
-            File.WriteAllText(ConfigPath, new JavaScriptSerializer().Serialize(this));
+            File.WriteAllText(ConfigPath, Indent(new JavaScriptSerializer().Serialize(this)));
+        }
+
+        /// <summary>Pretty-prints minified JSON; the config is a flat object, so no array/empty-object edge cases arise.</summary>
+        private static string Indent(string json)
+        {
+            var sb = new StringBuilder();
+            var depth = 0;
+            var inString = false;
+            for (var i = 0; i < json.Length; i++)
+            {
+                var c = json[i];
+                if (inString)
+                {
+                    sb.Append(c);
+                    if (c == '\\' && i + 1 < json.Length) sb.Append(json[++i]);
+                    else if (c == '"') inString = false;
+                    continue;
+                }
+                switch (c)
+                {
+                    case '"': inString = true; sb.Append(c); break;
+                    case '{':
+                    case '[': sb.Append(c).Append('\n').Append(' ', ++depth * 2); break;
+                    case '}':
+                    case ']': sb.Append('\n').Append(' ', --depth * 2).Append(c); break;
+                    case ',': sb.Append(c).Append('\n').Append(' ', depth * 2); break;
+                    case ':': sb.Append(": "); break;
+                    default: sb.Append(c); break;
+                }
+            }
+            return sb.ToString();
         }
     }
 
