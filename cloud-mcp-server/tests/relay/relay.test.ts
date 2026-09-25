@@ -53,8 +53,9 @@ function fakeToolResult(message: RelayRequestMessage): RelayMessage {
         success: true,
         format: jpeg ? "jpeg" : "png",
         mimeType: jpeg ? "image/jpeg" : "image/png",
-        base64Data:
-          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+        uploaded: true,
+        url: "https://bucket.example/screenshots/x.png?X-Amz-Signature=demo",
+        size: 1024,
         width: 1,
         height: 1,
         originalWidth: 1,
@@ -62,7 +63,7 @@ function fakeToolResult(message: RelayRequestMessage): RelayMessage {
         scale: 1,
         originX: 0,
         originY: 0,
-        displays: [{ index: 0, x: 0, y: 0, width: 1920, height: 1080, isPrimary: true }],
+        displays: [{ index: 0, x: 0, y: 0, width: 1920, height: 1080, isPrimary: true, dpi: 96 }],
         virtualBounds: { x: 0, y: 0, width: 1920, height: 1080 },
         cursor: { x: 0, y: 0 },
         backend: FAKE_BACKEND,
@@ -300,23 +301,24 @@ test("mouse scroll and drag relay through the fake device", async () => {
   });
 });
 
-test("screenshot relays an image with coordinate metadata and honours format", async () => {
+test("screenshot forwards a presigned URL with no image bytes", async () => {
   await withRegisteredDevice(async (client) => {
     const png = await client.callTool({ name: "screenshot", arguments: { deviceId: DEVICE_ID } });
-    const [image, meta] = png.content as Array<Record<string, unknown>>;
-    assert.equal(image.type, "image");
-    assert.equal(image.mimeType, "image/png");
-    assert.equal(typeof image.data, "string");
-    const parsed = JSON.parse((meta as { text: string }).text);
+    const content = png.content as Array<Record<string, unknown>>;
+    assert.ok(!content.some((c) => c.type === "image"));
+    const text = content.find((c) => c.type === "text") as { text: string };
+    const parsed = JSON.parse(text.text);
     assert.equal(parsed.success, true);
     assert.equal(parsed.width, 1);
     assert.equal(parsed.originX, 0);
     assert.ok(Array.isArray(parsed.displays) && parsed.displays.length >= 1 && parsed.displays[0].isPrimary === true);
-    assert.equal(parsed.base64Data, undefined); // stripped from the meta block
+    assert.ok(typeof parsed.url === "string" && parsed.url.includes("X-Amz-Signature"));
+    assert.equal(parsed.base64Data, undefined);
 
     const jpeg = await client.callTool({ name: "screenshot", arguments: { deviceId: DEVICE_ID, format: "jpeg" } });
-    const [jpegImage] = jpeg.content as Array<Record<string, unknown>>;
-    assert.equal(jpegImage.mimeType, "image/jpeg");
+    const [jpegContent] = jpeg.content as Array<Record<string, unknown>>;
+    const jpegParsed = JSON.parse((jpegContent as { text: string }).text);
+    assert.equal(jpegParsed.mimeType, "image/jpeg");
   });
 });
 

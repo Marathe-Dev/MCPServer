@@ -2,11 +2,10 @@ export interface ScreenshotResult {
   success: boolean;
   format: "png" | "jpeg";
   mimeType?: string;
-  /** Base64-encoded image bytes (inline mode). */
-  base64Data?: string;
-  /** Presigned download URL when the agent uploaded to storage instead of inlining. */
+  /** Presigned download URL; the agent always uploads to storage instead of inlining bytes. */
   url?: string;
   uploaded?: boolean;
+  size?: number;
   width: number;
   height: number;
   originalWidth?: number;

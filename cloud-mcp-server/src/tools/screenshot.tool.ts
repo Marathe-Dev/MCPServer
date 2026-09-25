@@ -5,9 +5,10 @@ import type { ScreenshotResult } from "../models/screenshot.models.js";
 
 /**
  * `screenshot` — capture a device's screen (primary display, a specific display,
- * the whole virtual desktop, or a window) as an image with display + coordinate
- * metadata so the agent can map pixels to input coordinates. Auto-compresses
- * large frames to JPEG. Extends the HopToDesk MCP tool of the same name.
+ * the whole virtual desktop, or a window) and upload it to storage, returning a
+ * presigned download URL plus display + coordinate metadata so the agent can map
+ * pixels to input coordinates. Auto-compresses large frames to JPEG. Extends the
+ * HopToDesk MCP tool of the same name.
  */
 export function registerScreenshotTool(
   server: McpServer,
@@ -17,7 +18,7 @@ export function registerScreenshotTool(
     "screenshot",
     {
       description:
-        "Capture a device's screen as an image with display + coordinate metadata. Target the primary display, a specific display, the whole virtual desktop, or a window. Large frames auto-compress to JPEG. Map a pixel to a real coordinate as originX + pixelX / scale.",
+        "Capture a device's screen and upload it to storage, returning a presigned URL plus display + coordinate metadata. Target the primary display, a specific display, the whole virtual desktop, or a window. Large frames auto-compress to JPEG. Map a pixel to a real coordinate as originX + pixelX / scale.",
       inputSchema: z.object({
         deviceId: z.string().min(1).describe("Target deviceId from list_devices; not the readable deviceName"),
         target: z.enum(["primary", "virtual", "display", "window"]).default("primary").describe("primary display, whole virtual desktop, a specific display, or a window"),
@@ -35,23 +36,7 @@ export function registerScreenshotTool(
         args,
         60000,
       );
-      const { base64Data, ...meta } = result;
-      if (!base64Data) {
-        return { content: [{ type: "text", text: JSON.stringify(meta) }] };
-      }
-      return {
-        content: [
-          {
-            type: "image",
-            data: base64Data,
-            mimeType: result.mimeType ?? (result.format === "jpeg" ? "image/jpeg" : "image/png"),
-          },
-          {
-            type: "text",
-            text: JSON.stringify(meta),
-          },
-        ],
-      };
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
     },
   );
 }

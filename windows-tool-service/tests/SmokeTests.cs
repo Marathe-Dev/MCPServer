@@ -187,20 +187,34 @@ namespace WindowsToolService
             Assert(windowList.Count == 0 || (windowJson.Contains("\"processId\"") && windowJson.Contains("\"displayIndex\"") && windowJson.Contains("\"isMinimized\"")),
                 "window list includes process, state and monitor fields");
 
-            // Screenshot always returns inline base64 (no storage required).
-            var screenshot = (Dictionary<string, object>)(await desktop.CallAsync("screenshot.capture", new Dictionary<string, object> { { "format", "png" } }, CancellationToken.None));
-            var image = Convert.FromBase64String((string)screenshot["base64Data"]);
-            Assert(image.Length > 8 && image[0] == 137 && image[1] == 80 && (int)screenshot["width"] > 0, "native PNG screenshot");
-            Assert(((System.Collections.IList)screenshot["displays"]).Count >= 1 && screenshot.ContainsKey("originX") && screenshot.ContainsKey("scale") && (string)screenshot["mimeType"] == "image/png",
-                "screenshot attaches display + coordinate metadata");
-            Assert(new JavaScriptSerializer().Serialize(screenshot["displays"]).Contains("\"dpi\":"), "screenshot displays[] report per-monitor dpi");
+            // Screenshot requires storage; without it the call must fail instead of falling back to inline bytes.
+            try { await desktop.CallAsync("screenshot.capture", new Dictionary<string, object>(), CancellationToken.None); throw new Exception("Expected storage-required rejection."); }
+            catch (InvalidOperationException) { Assert(true, "screenshot requires storage (no inline base64 fallback)"); }
 
-            var jpegShot = (Dictionary<string, object>)(await desktop.CallAsync("screenshot.capture", new Dictionary<string, object> { { "format", "jpeg" }, { "quality", 70 } }, CancellationToken.None));
-            var jpegBytes = Convert.FromBase64String((string)jpegShot["base64Data"]);
-            Assert(jpegBytes.Length > 3 && jpegBytes[0] == 0xFF && jpegBytes[1] == 0xD8 && (string)jpegShot["mimeType"] == "image/jpeg", "screenshot JPEG encoding");
+            using (var bucket = new FakeBucket())
+            {
+                var storage = new AgentConfig { CloudUrl = "ws://127.0.0.1:4000", DeviceId = "dev", DeviceName = "dev",
+                    E2StorageEndpoint = bucket.Endpoint, E2StorageRegion = "us-east-1", E2StorageBucket = "b",
+                    E2StorageAccessKey = "AKID", E2StorageSecretKey = "secret", StorageGetTtlSeconds = 900 };
+                var uploadTools = new DesktopTools(storage);
+                using (var http = new System.Net.Http.HttpClient())
+                {
+                    var screenshot = (Dictionary<string, object>)(await uploadTools.CallAsync("screenshot.capture", new Dictionary<string, object> { { "format", "png" } }, CancellationToken.None));
+                    Assert((bool)screenshot["uploaded"] && !screenshot.ContainsKey("base64Data") && ((string)screenshot["url"]).Contains("X-Amz-Signature"), "screenshot uploads and returns a URL");
+                    var image = await http.GetByteArrayAsync((string)screenshot["url"]);
+                    Assert(image.Length > 8 && image[0] == 137 && image[1] == 80 && (int)screenshot["width"] > 0, "native PNG screenshot");
+                    Assert(((System.Collections.IList)screenshot["displays"]).Count >= 1 && screenshot.ContainsKey("originX") && screenshot.ContainsKey("scale") && (string)screenshot["mimeType"] == "image/png",
+                        "screenshot attaches display + coordinate metadata");
+                    Assert(new JavaScriptSerializer().Serialize(screenshot["displays"]).Contains("\"dpi\":"), "screenshot displays[] report per-monitor dpi");
 
-            var scaledShot = (Dictionary<string, object>)(await desktop.CallAsync("screenshot.capture", new Dictionary<string, object> { { "format", "png" }, { "maxWidth", 320 } }, CancellationToken.None));
-            Assert((int)scaledShot["width"] <= 320 && Convert.ToDouble(scaledShot["scale"]) <= 1.0, "screenshot downscales to maxWidth");
+                    var jpegShot = (Dictionary<string, object>)(await uploadTools.CallAsync("screenshot.capture", new Dictionary<string, object> { { "format", "jpeg" }, { "quality", 70 } }, CancellationToken.None));
+                    var jpegBytes = await http.GetByteArrayAsync((string)jpegShot["url"]);
+                    Assert(jpegBytes.Length > 3 && jpegBytes[0] == 0xFF && jpegBytes[1] == 0xD8 && (string)jpegShot["mimeType"] == "image/jpeg", "screenshot JPEG encoding");
+
+                    var scaledShot = (Dictionary<string, object>)(await uploadTools.CallAsync("screenshot.capture", new Dictionary<string, object> { { "format", "png" }, { "maxWidth", 320 } }, CancellationToken.None));
+                    Assert((int)scaledShot["width"] <= 320 && Convert.ToDouble(scaledShot["scale"]) <= 1.0, "screenshot downscales to maxWidth");
+                }
+            }
 
             var command = new WinPtyCommand();
             var echo = await Execute(command, "echo MCP_WINPTY_OK", 10000);

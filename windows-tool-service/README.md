@@ -110,7 +110,7 @@ owns launch/relaunch policy. Previously installed services are not automatically
 | --- | --- | --- |
 | `mouse` | `mouse.move` / `mouse.click` / `mouse.scroll` / `mouse.drag` | `action`; `x`, `y`; `button`, `clickType`; `toX`, `toY` (drag); `amount`, `axis` (scroll) |
 | `keyboard` | `keyboard.typeText` / `keyboard.keyPress` | `action` (`type`/`press`); `text` or `keys` (e.g. `["ctrl", "s"]`) |
-| `screenshot` | `screenshot.capture` | `target` (`primary`/`virtual`/`display`/`window`), `displayIndex`, `windowTitle`, `format` (`auto`/`png`/`jpeg`), `quality`, `maxWidth` — returns inline `base64Data` |
+| `screenshot` | `screenshot.capture` | `target` (`primary`/`virtual`/`display`/`window`), `displayIndex`, `windowTitle`, `format` (`auto`/`png`/`jpeg`), `quality`, `maxWidth` — requires storage configured (no inline base64 fallback) |
 | `get_window_list` | `window.listWindows` | — (visible windows with geometry, focus, `processName`/`processId`, min/max state, `displayIndex`; tool windows filtered) |
 | `cmd` | `cmd.execute` | `command`, optional `workingDirectory`, `timeoutMs`, `maxOutputChars` |
 | `get_file` | `file.read` | `path` (absolute); returns `url`, `name`, `size` — requires storage configured (no inline base64 fallback), files over 10 MB are rejected |
@@ -134,23 +134,25 @@ downscale before sending, which is the fastest way to shrink a 4K frame.
 
 Every capture attaches coordinate metadata so input lands correctly on multi-monitor setups:
 `originX`/`originY` (the captured region's top-left in virtual-desktop space), `width`/`height`
-(encoded pixels), `originalWidth`/`originalHeight`, `scale`, `displays[]`, `virtualBounds`, and
-`cursor`. Convert an image pixel to a real input coordinate as
+(encoded pixels), `originalWidth`/`originalHeight`, `scale`, `displays[]` (each with a diagnostic
+`dpi`), `virtualBounds`, and `cursor`. Convert an image pixel to a real input coordinate as
 `realX = originX + pixelX / scale` (and likewise for Y), then pass it to `mouse_move`/`mouse_click`.
-Mixed-DPI secondary monitors may capture scaled under the current System-DPI setting. The image
-is returned inline as **base64** (`base64Data`) — screenshots never use storage.
+The agent is Per-Monitor-V2 DPI aware, so this pixel space always matches mouse input coordinates
+exactly, including across monitors with different scale factors. The captured image also has the
+system cursor drawn on it, so you can visually confirm pointer position without an extra round trip.
+The image is uploaded to storage and returned as a **presigned URL** — screenshots require storage
+configured the same as `get_file` (see below).
 
-### Presigned file uploads (storage — required for `get_file`)
+### Presigned file uploads (storage — required)
 
-`get_file` uploads the file directly to S3-compatible storage (IDrive e2) and
-returns a short-lived **presigned URL** — there is no inline-base64 fallback, so every relay
+`screenshot` and `get_file` always upload directly to S3-compatible storage (IDrive e2) and
+return a short-lived **presigned URL** — there is no inline-base64 fallback, so every relay
 message stays small (needed when a broker caps message size, e.g. 500 KB) and no file bytes
 ever pass through the relay/broker. The AI agent downloads the URL with **no credentials**: the
 signature and expiry are embedded in the query string, the bucket stays private, and the link is
 scoped to that one object until it expires (default 15 minutes). **Storage must be configured**
-for `get_file` to work at all — without it, the call fails with a clear
-"Storage is not configured on this device" error. (`screenshot` needs no storage; it always
-returns inline base64.)
+for these two tools to work at all — without it, calls fail with a clear
+"Storage is not configured on this device" error instead of falling back to inline bytes.
 
 Configure with environment variables. The access/secret keys are read from the environment
 only and are never written to `config.json`:

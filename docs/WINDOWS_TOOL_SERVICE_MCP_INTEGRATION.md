@@ -156,7 +156,7 @@ Press a key combination together (e.g. Ctrl+S), then release in reverse order.
 **result:** *(envelope only)*
 
 ### 4.7 `screenshot.capture`
-Capture a screen region. The image is returned **inline as base64** (`base64Data`) — no storage or upload is involved. The agent is Per-Monitor-V2 DPI aware, so this pixel space always matches `mouse.move`/`mouse.click` input coordinates exactly, including across monitors with different scale factors.
+Capture a screen region. **Requires storage to be configured on the device** (§4.11) — there is no inline-base64 fallback, so a misconfigured device fails clearly instead of flooding the relay with image bytes. The agent is Per-Monitor-V2 DPI aware, so this pixel space always matches `mouse.move`/`mouse.click` input coordinates exactly, including across monitors with different scale factors.
 
 | args | type | required | notes |
 |---|---|---|---|
@@ -176,10 +176,10 @@ Capture a screen region. The image is returned **inline as base64** (`base64Data
   "displays": [{ "index": 0, "x": 0, "y": 0, "width": 0, "height": 0, "isPrimary": true, "dpi": 96 }],
   "virtualBounds": { "x": 0, "y": 0, "width": 0, "height": 0 },
   "cursor": { "x": 0, "y": 0 },
-  "base64Data": "<base64-encoded PNG/JPEG bytes>"
+  "uploaded": true, "size": 0, "url": "https://…presigned…"
 }
 ```
-> Map a screenshot pixel back to a real screen coordinate as `originX + pixelX / scale`. The image bytes come back inline in `base64Data` — decode it against `mimeType`, and it already has the system cursor drawn on it (no separate confirmation call needed). `displays[].dpi` is diagnostic only — coordinates are already consistent, you don't need to apply it yourself. Screenshots do not use storage, so no configuration is required.
+> Map a screenshot pixel back to a real screen coordinate as `originX + pixelX / scale`. There is never a `base64Data` field — image bytes never travel over the relay/broker, only the presigned URL, and the image already has the system cursor drawn on it (no separate confirmation call needed). `displays[].dpi` is diagnostic only — coordinates are already consistent, you don't need to apply it yourself. If storage isn't configured, you'll get `ok:false, error:"Storage is not configured on this device. Configure storage to use screenshot.capture."`
 
 ### 4.8 `window.listWindows`
 List visible top-level windows.
@@ -237,8 +237,8 @@ Read a file from the device's local disk. **Requires storage to be configured on
 ```
 > There is never a `base64Data` field — file bytes never travel over the relay/broker, only the presigned URL. If storage isn't configured, you'll get `ok:false, error:"Storage is not configured on this device. Configure storage to use file.read."`
 
-### 4.11 Storage is mandatory for `file.read`
-`file.read` always uploads the file's bytes to S3-compatible storage on the device and returns a presigned URL — **there is no inline-base64 mode**, by design, so file bytes never pass through the broker or MCP server. Every machine that needs to serve `file.read` must have storage configured locally in `windows-tool-service` (`E2StorageEndpoint`/`E2StorageRegion`/`E2StorageBucket`/`E2StorageAccessKey`/`E2StorageSecretKey`) — that's a local agent configuration concern, not something the MCP server sends per call. If it's missing, expect `ok:false` with the error quoted above instead of a result. (`screenshot.capture` needs no storage — it always returns inline `base64Data`.)
+### 4.11 Storage is mandatory for `screenshot.capture` and `file.read`
+Both tools always upload their bytes to S3-compatible storage on the device and return a presigned URL — **there is no inline-base64 mode at all**, by design, so file/image bytes never pass through the broker or MCP server. This means every machine that needs to serve these two tools must have storage configured locally in `windows-tool-service` (`E2StorageEndpoint`/`E2StorageRegion`/`E2StorageBucket`/`E2StorageAccessKey`/`E2StorageSecretKey`) — that's a local agent configuration concern, not something the MCP server sends per call. If it's missing, expect `ok:false` with the errors quoted above instead of a result.
 
 ---
 
