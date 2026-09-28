@@ -160,7 +160,7 @@ Capture a screen region. **Requires storage to be configured on the device** (§
 
 | args | type | required | notes |
 |---|---|---|---|
-| `target` | `"primary"` \| `"virtual"` \| `"display"` \| `"window"` | no | default `"primary"` |
+| `target` | `"primary"` \| `"virtual"` \| `"display"` \| `"window"` | no | default `"virtual"` (whole multi-monitor desktop) |
 | `displayIndex` | integer | no | monitor index from a prior `displays[]`; defaults to `0` if omitted, even when `target="display"` |
 | `windowTitle` | string, ≤512 chars | only if `target="window"` | substring match, prefers the focused window — no sensible default, so this one is genuinely required in that case |
 | `format` | `"auto"` \| `"png"` \| `"jpeg"` | no | default `"auto"` — PNG for small frames, JPEG for large |

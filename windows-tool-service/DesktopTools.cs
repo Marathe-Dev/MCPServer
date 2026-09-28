@@ -261,7 +261,7 @@ namespace WindowsToolService
         /// <summary>Captures a target region and its metadata; encoded bytes come back via out params (no base64).</summary>
         private static Dictionary<string, object> CaptureCore(IDictionary<string, object> args, out byte[] bytes, out string mimeType, out string format)
         {
-            var target = Arguments.Choice(args, "target", "primary", "primary", "virtual", "display", "window");
+            var target = Arguments.Choice(args, "target", "virtual", "primary", "virtual", "display", "window");
             Rectangle source;
             switch (target)
             {

@@ -126,11 +126,11 @@ Older TypeScript-based device agents still handle mouse move/click and keyboard 
 
 ### Screenshots (multi-display, window, and compression)
 
-`screenshot` captures the `primary` display by default, or the whole `virtual` desktop, a
-specific `display` (`displayIndex` from a prior capture's `displays[]`), or a `window`
-(`windowTitle` substring). Encoding is `auto` — PNG for small/text frames, JPEG for large
-ones — and you can force `format` (`png`/`jpeg`), set JPEG `quality`, or `maxWidth` to
-downscale before sending, which is the fastest way to shrink a 4K frame.
+`screenshot` captures the whole `virtual` desktop (all monitors) by default, or just the
+`primary` display, a specific `display` (`displayIndex` from a prior capture's `displays[]`),
+or a `window` (`windowTitle` substring). Encoding is `auto` — PNG for small/text frames, JPEG
+for large ones — and you can force `format` (`png`/`jpeg`), set JPEG `quality`, or `maxWidth`
+to downscale before sending, which is the fastest way to shrink a 4K frame.
 
 Every capture attaches coordinate metadata so input lands correctly on multi-monitor setups:
 `originX`/`originY` (the captured region's top-left in virtual-desktop space), `width`/`height`

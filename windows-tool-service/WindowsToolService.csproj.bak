@@ -97,6 +97,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include=".gitignore" />
+    <Content Include="icons8-service-100.ico" />
     <Content Include="MCP_Service.ico" />
     <Content Include="native\winpty.dll" Condition="Exists('native\winpty.dll')">
       <Link>winpty.dll</Link>

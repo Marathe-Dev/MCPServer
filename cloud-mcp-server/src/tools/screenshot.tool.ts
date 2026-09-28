@@ -18,10 +18,10 @@ export function registerScreenshotTool(
     "screenshot",
     {
       description:
-        "Capture a device's screen and upload it to storage, returning a presigned URL plus display + coordinate metadata. Target the primary display, a specific display, the whole virtual desktop, or a window. Large frames auto-compress to JPEG. Map a pixel to a real coordinate as originX + pixelX / scale.",
+        "Capture a device's screen and upload it to storage, returning a presigned URL plus display + coordinate metadata. Defaults to the whole virtual desktop (all monitors); can target the primary display, a specific display, or a window. Large frames auto-compress to JPEG. Map a pixel to a real coordinate as originX + pixelX / scale.",
       inputSchema: z.object({
         deviceId: z.string().min(1).describe("Target deviceId from list_devices; not the readable deviceName"),
-        target: z.enum(["primary", "virtual", "display", "window"]).default("primary").describe("primary display, whole virtual desktop, a specific display, or a window"),
+        target: z.enum(["primary", "virtual", "display", "window"]).default("virtual").describe("whole virtual desktop (all monitors), primary display, a specific display, or a window"),
         displayIndex: z.number().int().min(0).optional().describe("Monitor index (from a prior screenshot's displays[]) when target=display"),
         windowTitle: z.string().min(1).max(512).optional().describe("Window title substring when target=window"),
         format: z.enum(["auto", "png", "jpeg"]).default("auto").describe("auto = PNG for small frames, JPEG for large"),
