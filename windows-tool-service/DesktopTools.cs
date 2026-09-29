@@ -37,7 +37,7 @@ namespace WindowsToolService
         // Broker-facing tool name -> internal switch name. Add new aliases here only.
         private static readonly Dictionary<string, string> ToolAliases = new Dictionary<string, string>
         {
-            { "RemoteScreenshot", "screenshot.capture" },
+            { "RemoteScreenshot", "RemoteScreenshot" },
         };
 
         /// <summary>Routes one relay tool call to its handler and returns the result.</summary>
@@ -49,26 +49,44 @@ namespace WindowsToolService
             switch (tool)
             {
                 // Remote command execution — opt-in; WinPTY runs its own desktop check.
-                case "cmd.execute":
+                case "RemoteCMD":
                     if (!_config.EnableCmd)
                         throw new InvalidOperationException("CMD is disabled. Enable remote CMD in the agent window.");
                     return await _command.ExecuteAsync(args, token).ConfigureAwait(false);
 
                 // File read — no desktop required; always uploads to storage and returns a URL, never inline bytes.
-                case "file.read":
+                case "RemoteGetFile":
                     if (!_config.StorageEnabled)
-                        throw new InvalidOperationException("Storage is not configured on this device. Configure storage to use file.read.");
+                        throw new InvalidOperationException("Storage is not configured on this device. Configure storage to use RemoteGetFile.");
                     return await FileTools.UploadAsync(args, _config, token).ConfigureAwait(false);
 
                 // Desktop input / capture — needs an unlocked, interactive desktop.
-                case "mouse.move":  RequireInteractiveDesktop(); return Move(args, click: false);
-                case "mouse.click": RequireInteractiveDesktop(); return Move(args, click: true);
-                case "mouse.scroll": RequireInteractiveDesktop(); return Scroll(args);
-                case "mouse.drag": RequireInteractiveDesktop(); return Drag(args);
-                case "keyboard.typeText": RequireInteractiveDesktop(); return TypeText(args);
-                case "keyboard.keyPress": RequireInteractiveDesktop(); return Press(args);
-                case "screenshot.capture": RequireInteractiveDesktop(); return await CaptureAsync(args, token).ConfigureAwait(false);
-                case "window.listWindows": RequireInteractiveDesktop(); return Windows();
+                case "RemoteMouse":
+                {
+                    RequireInteractiveDesktop();
+                    var action = Arguments.Text(args, "action", 20);
+                    switch (action)
+                    {
+                        case "move": return Move(args, click: false);
+                        case "click": return Move(args, click: true);
+                        case "scroll": return Scroll(args);
+                        case "drag": return Drag(args);
+                        default: throw new ArgumentException("Unsupported mouse action: " + action);
+                    }
+                }
+                case "RemoteKeyboard":
+                {
+                    RequireInteractiveDesktop();
+                    var action = Arguments.Text(args, "action", 20);
+                    switch (action)
+                    {
+                        case "type": return TypeText(args);
+                        case "press": return Press(args);
+                        default: throw new ArgumentException("Unsupported keyboard action: " + action);
+                    }
+                }
+                case "RemoteScreenshot": RequireInteractiveDesktop(); return await CaptureAsync(args, token).ConfigureAwait(false);
+                case "RemoteWindowsList": RequireInteractiveDesktop(); return Windows(args);
 
                 default:
                     throw new ArgumentException("Unsupported tool: " + tool);
@@ -257,6 +275,7 @@ namespace WindowsToolService
         }
 
         private const long AutoPngMaxPixels = 1000000;
+        private const int WindowListPageSize = 15;
 
         /// <summary>Captures a target region and its metadata; encoded bytes come back via out params (no base64).</summary>
         private static Dictionary<string, object> CaptureCore(IDictionary<string, object> args, out byte[] bytes, out string mimeType, out string format)
@@ -348,7 +367,7 @@ namespace WindowsToolService
         private async Task<object> CaptureAsync(IDictionary<string, object> args, CancellationToken token)
         {
             if (!_config.StorageEnabled)
-                throw new InvalidOperationException("Storage is not configured on this device. Configure storage to use screenshot.capture.");
+                throw new InvalidOperationException("Storage is not configured on this device. Configure storage to use RemoteScreenshot.");
 
             byte[] bytes;
             string mimeType, format;
@@ -433,8 +452,8 @@ namespace WindowsToolService
             return Rectangle.FromLTRB(rect.Left, rect.Top, rect.Right, rect.Bottom);
         }
 
-        /// <summary>Lists visible, titled top-level windows with process, state and monitor info.</summary>
-        private static object Windows()
+        /// <summary>Lists visible, titled top-level windows with process, state and monitor info, 15 per page.</summary>
+        private static object Windows(IDictionary<string, object> args)
         {
             var windows = new List<object>();
             var foreground = GetForegroundWindow();
@@ -479,8 +498,15 @@ namespace WindowsToolService
 
             if (!EnumWindows(callback, IntPtr.Zero)) throw new Win32Exception();
 
+            var offset = Arguments.Integer(args, "offset", 0, int.MaxValue, 0);
+            var page = windows.Skip(offset).Take(WindowListPageSize).ToList();
+
             var result = Result();
-            result["windows"] = windows;
+            result["windows"] = page;
+            result["total"] = windows.Count;
+            result["offset"] = offset;
+            result["count"] = page.Count;
+            result["hasMore"] = offset + page.Count < windows.Count;
             return result;
         }
 

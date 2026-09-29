@@ -26,7 +26,7 @@ export function registerMouseTool(server: McpServer, deviceRegistry: DeviceRegis
       }),
     },
     async ({ deviceId, action, ...rest }) => {
-      const result = await deviceRegistry.sendRequest(deviceId, `mouse.${action}`, rest);
+      const result = await deviceRegistry.sendRequest(deviceId, "RemoteMouse", { action, ...rest });
       return { content: [{ type: "text", text: JSON.stringify(result) }] };
     },
   );

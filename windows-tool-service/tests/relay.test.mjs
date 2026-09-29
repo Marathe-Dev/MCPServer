@@ -48,7 +48,7 @@ test("C# relay handles fragmentation, concurrent ping, busy errors, reconnect an
     assert.equal((await next((message) => message.requestId === "wait")).ok, true);
     socket.send(JSON.stringify({ type: "tool_call", requestId: "bad", tool: "unsupported", args: {} }));
     assert.match((await next((message) => message.requestId === "bad")).error, /Unsupported tool/);
-    socket.send(JSON.stringify({ type: "tool_call", requestId: "cmd", tool: "cmd.execute", args: { command: "echo RELAY_WINPTY_OK" } }));
+    socket.send(JSON.stringify({ type: "tool_call", requestId: "cmd", tool: "RemoteCMD", args: { command: "echo RELAY_WINPTY_OK" } }));
     const command = await next((message) => message.requestId === "cmd");
     assert.equal(command.ok, true);
     assert.equal(command.result.exitCode, 0);

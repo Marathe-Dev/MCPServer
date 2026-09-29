@@ -2,8 +2,8 @@
  * Wire protocol for the WebSocket relay between the Cloud MCP Server and
  * each connected Local Tool Service. Kept identical (copy) in both projects.
  */
-/** Mirrors the 4 I*Service method names 1:1 so dispatch is a plain switch on both ends. */
-export type RelayToolName = "mouse.move" | "mouse.click" | "mouse.scroll" | "mouse.drag" | "keyboard.typeText" | "keyboard.keyPress" | "screenshot.capture" | "window.listWindows" | "cmd.execute" | "file.read";
+/** Mirrors the local service's dispatch 1:1 so both ends can dispatch with a plain switch. */
+export type RelayToolName = "mouse" | "keyboard" | "screenshot.capture" | "window.listWindows" | "cmd.execute" | "file.read";
 export interface RegisterMessage {
     type: "register";
     deviceId: string;

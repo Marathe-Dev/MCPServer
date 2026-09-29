@@ -33,7 +33,7 @@ This is the exact shape the MCP server sends to the broker for every one of our 
   "to_machine_id": "C4C6E62A503B",
   "to_username": "eAHk7VDH8x",
   "message_details": {
-    "type": "cmd.execute",
+    "type": "RemoteCMD",
     "requestId": "5d1805de-e17e-437f-bfee-0f5731162696",
     "hostdesc": "SIRISHA-DAVRC",
     "rtype": "1",
@@ -80,9 +80,9 @@ Treat `ok: false` as a tool-level failure (bad args, disabled feature, locked de
 
 | Tool | Recommended timeout |
 |---|---|
-| `cmd.execute` | 30,000 ms (caller's own `timeoutMs` arg caps execution at 20,000 ms; leave headroom for I/O) |
-| `screenshot.capture` | 60,000 ms (capture + encoding of large frames) |
-| `file.read` | 30,000 ms (upload for larger files) |
+| `RemoteCMD` | 30,000 ms (caller's own `timeoutMs` arg caps execution at 20,000 ms; leave headroom for I/O) |
+| `RemoteScreenshot` | 60,000 ms (capture + encoding of large frames) |
+| `RemoteGetFile` | 30,000 ms (upload for larger files) |
 | everything else (mouse/keyboard/window) | 15,000 ms |
 
 - If the machine's `windows-tool-service` isn't connected to RPCService at all (pipe down), RPCService should surface that as its own transport-level error to the broker — that's outside `windows-tool-service`'s contract.
@@ -93,70 +93,34 @@ Treat `ok: false` as a tool-level failure (bad args, disabled feature, locked de
 
 Every table below is the **authoritative wire contract**. `args` must be sent exactly as shown; `result` is exactly what comes back inside `tool_result.result`. All results also include a common envelope: `success` (bool), `backend` (string, e.g. `"win32"`/`"winpty"`), `timestamp` (ISO-8601 UTC) — omitted from the tables below for brevity, but always present.
 
-### 4.1 `mouse.move`
-Move the cursor.
+### 4.1 `mouse`
+One tool for every mouse action; `args.action` selects the sub-behavior.
 
 | args | type | required | notes |
 |---|---|---|---|
-| `x` | integer | yes | virtual-desktop pixel |
-| `y` | integer | yes | virtual-desktop pixel |
+| `action` | `"move"` \| `"click"` \| `"scroll"` \| `"drag"` | yes | which mouse action to perform |
+| `x`, `y` | integer | for `move`/`click`/`drag` (drag start); optional for `scroll` | virtual-desktop pixel |
+| `button` | `"left"` \| `"right"` | no | default `"left"`; used by `click`/`drag` |
+| `clickType` | `"single"` \| `"double"` | no | default `"single"`; used by `click` |
+| `toX`, `toY` | integer | yes for `drag` | drag end |
+| `amount` | integer, -100..100 | yes for `scroll` | notches; positive = up/right |
+| `axis` | `"vertical"` \| `"horizontal"` | no | default `"vertical"`; used by `scroll` |
 
-**result:** `{ x, y }`
+**result:** `move`/`click` → `{ x, y }`; `scroll` → `{ amount, axis }`; `drag` → `{ x, y, toX, toY }`
 
-### 4.2 `mouse.click`
-Move the cursor and click.
-
-| args | type | required | notes |
-|---|---|---|---|
-| `x` | integer | yes | virtual-desktop pixel |
-| `y` | integer | yes | virtual-desktop pixel |
-| `button` | `"left"` \| `"right"` | no | default `"left"` |
-| `clickType` | `"single"` \| `"double"` | no | default `"single"` |
-
-**result:** `{ x, y }`
-
-### 4.3 `mouse.scroll`
-Scroll the wheel, optionally after moving to a point first.
+### 4.2 `keyboard`
+One tool for keyboard input; `args.action` selects `type` (literal text) or `press` (key combo).
 
 | args | type | required | notes |
 |---|---|---|---|
-| `amount` | integer, -100..100 | yes | notches; positive = up/right |
-| `axis` | `"vertical"` \| `"horizontal"` | no | default `"vertical"` |
-| `x`, `y` | integer | no | move here before scrolling |
-
-**result:** `{ amount, axis }`
-
-### 4.4 `mouse.drag`
-Press a button at one point, move to another, release.
-
-| args | type | required | notes |
-|---|---|---|---|
-| `x`, `y` | integer | yes | drag start |
-| `toX`, `toY` | integer | yes | drag end |
-| `button` | `"left"` \| `"right"` | no | default `"left"` |
-
-**result:** `{ x, y, toX, toY }`
-
-### 4.5 `keyboard.typeText`
-Type literal Unicode text.
-
-| args | type | required | notes |
-|---|---|---|---|
-| `text` | string, ≤20,000 chars | yes | typed as key-down/up pairs per character |
+| `action` | `"type"` \| `"press"` | yes | `type` sends literal text; `press` taps a key combination together, then releases in reverse order |
+| `text` | string, ≤20,000 chars | yes for `type` | typed as key-down/up pairs per character |
+| `keys` | array of strings, 1–16 items | yes for `press` | e.g. `["ctrl", "s"]`. Accepts letters, digits, F1–F24, and aliases (`ctrl`/`alt`/`shift`/`win`, `enter`, `esc`, `tab`, `space`, `backspace`, `delete`, arrows, `home`/`end`/`pageup`/`pagedown`, punctuation) |
 
 **result:** *(envelope only)*
 
-### 4.6 `keyboard.keyPress`
-Press a key combination together (e.g. Ctrl+S), then release in reverse order.
-
-| args | type | required | notes |
-|---|---|---|---|
-| `keys` | array of strings, 1–16 items | yes | e.g. `["ctrl", "s"]`. Accepts letters, digits, F1–F24, and aliases (`ctrl`/`alt`/`shift`/`win`, `enter`, `esc`, `tab`, `space`, `backspace`, `delete`, arrows, `home`/`end`/`pageup`/`pagedown`, punctuation) |
-
-**result:** *(envelope only)*
-
-### 4.7 `screenshot.capture`
-Capture a screen region. **Requires storage to be configured on the device** (§4.11) — there is no inline-base64 fallback, so a misconfigured device fails clearly instead of flooding the relay with image bytes. The agent is Per-Monitor-V2 DPI aware, so this pixel space always matches `mouse.move`/`mouse.click` input coordinates exactly, including across monitors with different scale factors.
+### 4.3 `RemoteScreenshot`
+Capture a screen region. **Requires storage to be configured on the device** (§4.7) — there is no inline-base64 fallback, so a misconfigured device fails clearly instead of flooding the relay with image bytes. The agent is Per-Monitor-V2 DPI aware, so this pixel space always matches `mouse` action=`move`/`click` input coordinates exactly, including across monitors with different scale factors.
 
 | args | type | required | notes |
 |---|---|---|---|
@@ -179,12 +143,14 @@ Capture a screen region. **Requires storage to be configured on the device** (§
   "uploaded": true, "size": 0, "url": "https://…presigned…"
 }
 ```
-> Map a screenshot pixel back to a real screen coordinate as `originX + pixelX / scale`. There is never a `base64Data` field — image bytes never travel over the relay/broker, only the presigned URL, and the image already has the system cursor drawn on it (no separate confirmation call needed). `displays[].dpi` is diagnostic only — coordinates are already consistent, you don't need to apply it yourself. If storage isn't configured, you'll get `ok:false, error:"Storage is not configured on this device. Configure storage to use screenshot.capture."`
+> Map a screenshot pixel back to a real screen coordinate as `originX + pixelX / scale`. There is never a `base64Data` field — image bytes never travel over the relay/broker, only the presigned URL, and the image already has the system cursor drawn on it (no separate confirmation call needed). `displays[].dpi` is diagnostic only — coordinates are already consistent, you don't need to apply it yourself. If storage isn't configured, you'll get `ok:false, error:"Storage is not configured on this device. Configure storage to use RemoteScreenshot."`
 
-### 4.8 `window.listWindows`
-List visible top-level windows.
+### 4.4 `RemoteWindowsList`
+List visible top-level windows, 15 per page.
 
-*No args.*
+| args | type | required | notes |
+|---|---|---|---|
+| `offset` | integer ≥ 0 | no | default `0`; skip this many windows to get the next page |
 
 **result:**
 ```json
@@ -195,11 +161,13 @@ List visible top-level windows.
       "isFocused": true, "isMinimized": false, "isMaximized": false,
       "processId": 0, "processName": "string", "displayIndex": 0
     }
-  ]
+  ],
+  "total": 0, "offset": 0, "count": 0, "hasMore": false
 }
 ```
+> `windows` never has more than 15 entries. `total` is how many windows matched overall, `count` is how many are in this page, and `hasMore` tells you whether to call again with `offset` = previous `offset + count` to get the rest.
 
-### 4.9 `cmd.execute`
+### 4.5 `RemoteCMD`
 Run one CMD command line through a real console (WinPTY) as the signed-in user.
 
 | args | type | required | notes |
@@ -221,8 +189,8 @@ Run one CMD command line through a real console (WinPTY) as the signed-in user.
 ```
 > **Requires** the target machine's `windows-tool-service` to have "Allow remote CMD execution" enabled locally — this is a manual opt-in the signed-in user controls, it cannot be turned on remotely. If disabled, you'll get `ok:false, error:"CMD is disabled. Enable remote CMD in the agent window."`. Also requires an unlocked, interactive desktop (not locked/screen-saver/secure-desktop) — otherwise `ok:false, error:"Desktop unavailable or locked. Unlock the signed-in session first."`.
 
-### 4.10 `file.read`
-Read a file from the device's local disk. **Requires storage to be configured on the device** (§4.11) — there is no inline-bytes fallback.
+### 4.6 `RemoteGetFile`
+Read a file from the device's local disk. **Requires storage to be configured on the device** (§4.7) — there is no inline-bytes fallback.
 
 | args | type | required | notes |
 |---|---|---|---|
@@ -235,28 +203,28 @@ Read a file from the device's local disk. **Requires storage to be configured on
   "contentType": "application/octet-stream", "uploaded": true, "url": "https://…presigned…"
 }
 ```
-> There is never a `base64Data` field — file bytes never travel over the relay/broker, only the presigned URL. If storage isn't configured, you'll get `ok:false, error:"Storage is not configured on this device. Configure storage to use file.read."`
+> There is never a `base64Data` field — file bytes never travel over the relay/broker, only the presigned URL. If storage isn't configured, you'll get `ok:false, error:"Storage is not configured on this device. Configure storage to use RemoteGetFile."`
 
-### 4.11 Storage is mandatory for `screenshot.capture` and `file.read`
+### 4.7 Storage is mandatory for `RemoteScreenshot` and `RemoteGetFile`
 Both tools always upload their bytes to S3-compatible storage on the device and return a presigned URL — **there is no inline-base64 mode at all**, by design, so file/image bytes never pass through the broker or MCP server. This means every machine that needs to serve these two tools must have storage configured locally in `windows-tool-service` (`E2StorageEndpoint`/`E2StorageRegion`/`E2StorageBucket`/`E2StorageAccessKey`/`E2StorageSecretKey`) — that's a local agent configuration concern, not something the MCP server sends per call. If it's missing, expect `ok:false` with the errors quoted above instead of a result.
 
 ---
 
 ## 5. Every tool requiring desktop input can fail with one common error
 
-`mouse.*`, `keyboard.*`, `screenshot.capture`, and `window.listWindows` all require an unlocked, interactive desktop session. If the machine is locked, on a UAC/secure desktop, or has no active session, every one of these returns:
+`mouse`, `keyboard`, `RemoteScreenshot`, and `RemoteWindowsList` all require an unlocked, interactive desktop session. If the machine is locked, on a UAC/secure desktop, or has no active session, every one of these returns:
 
 ```json
 { "ok": false, "error": "Desktop unavailable or locked. Unlock the signed-in session first." }
 ```
 
-`cmd.execute` and `file.read` do **not** require this and work even on a locked machine.
+`RemoteCMD` and `RemoteGetFile` do **not** require this and work even on a locked machine.
 
 ---
 
 ## 6. Checklist for the backend team
 
-1. Add MCP tool definitions for whichever of the 10 identifiers in §4 you want to expose to the AI agent (you can group them however fits your existing tool conventions — e.g. one consolidated `mouse` tool with an `action` enum, like the reference schema in [windows-tool-service/ToolInfo.json](../windows-tool-service/ToolInfo.json) — as long as your handler ultimately emits the exact `message_details.type` + `args` shape from §4).
+1. Add MCP tool definitions for whichever of the 6 identifiers in §4 you want to expose to the AI agent (`mouse` and `keyboard` are already consolidated with an `action` enum — see the reference schema in [windows-tool-service/ToolInfo.json](../windows-tool-service/ToolInfo.json) — as long as your handler ultimately emits the exact `message_details.type` + `args` shape from §4).
 2. When a tool is invoked, build the `MESSAGE_TO` envelope from §2 with `src:"MCP"`, `type` = the exact identifier, and `args` matching that tool's schema — no extra/renamed fields.
 3. Send it to the broker targeting the desired `to_machine_id`/`to_username`; wait for the correlated response using `requestId`, with the timeout from §3.
 4. On `ok:true`, return `result` to the caller; on `ok:false`, surface `error` as a tool failure (not a transport error) — do not retry automatically except for the `"Agent busy"` case.

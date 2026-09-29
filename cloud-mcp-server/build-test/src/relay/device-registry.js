@@ -65,7 +65,7 @@ export class DeviceRegistry {
         clearTimeout(pending.timeoutHandle);
         this.pending.delete(message.requestId);
         if (message.ok) {
-            pending.resolve(message.result);
+            pending.resolve(message.result); // Resolve pending request
         }
         else {
             pending.reject(new Error(message.error));

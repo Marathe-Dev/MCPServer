@@ -106,7 +106,7 @@ export class DeviceRegistry {
     clearTimeout(pending.timeoutHandle);
     this.pending.delete(message.requestId);
     if (message.ok) {
-      pending.resolve(message.result);
+      pending.resolve(message.result); // Resolve pending request
     } else {
       pending.reject(new Error(message.error));
     }
@@ -135,7 +135,7 @@ export class DeviceRegistry {
     };
     console.error(`[cloud-mcp-server] relay tool_call requestId=${requestId} deviceId=${deviceId} tool=${tool}`);
 
-    return new Promise<T>((resolve, reject) => {
+    return new Promise<T>((resolve, reject) => { // Wait till request is resolved
       const timeoutHandle = setTimeout(() => {
         this.pending.delete(requestId);
         console.error(`[cloud-mcp-server] relay tool_call timed out requestId=${requestId} tool=${tool}`);

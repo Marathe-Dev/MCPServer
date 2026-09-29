@@ -22,7 +22,7 @@ export function registerCmdTool(server: McpServer, deviceRegistry: DeviceRegistr
     },
     async ({ deviceId, ...args }) => {
       const result = await deviceRegistry.sendRequest<{ success: boolean }>(
-        deviceId, "cmd.execute", args, args.timeoutMs + 20000,
+        deviceId, "RemoteCMD", args, args.timeoutMs + 20000,
       );
       return {
         content: [{ type: "text", text: JSON.stringify(result) }],

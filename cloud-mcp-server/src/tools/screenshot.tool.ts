@@ -32,7 +32,7 @@ export function registerScreenshotTool(
     async ({ deviceId, ...args }) => {
       const result = await deviceRegistry.sendRequest<ScreenshotResult>(
         deviceId,
-        "screenshot.capture",
+        "RemoteScreenshot",
         args,
         60000,
       );

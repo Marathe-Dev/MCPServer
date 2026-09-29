@@ -92,13 +92,13 @@ namespace WindowsToolService
                 }
                 finally { try { File.Delete(oversized); } catch { } }
 
-                // DesktopTools is the single switch: it must route cmd + file.read too.
+                // DesktopTools is the single switch: it must route cmd + RemoteGetFile too.
                 var router = new DesktopTools(new AgentConfig { CloudUrl = "ws://127.0.0.1:4000", DeviceId = "router", DeviceName = "router", EnableCmd = false });
-                try { router.CallAsync("cmd.execute", new Dictionary<string, object> { { "command", "echo hi" } }, CancellationToken.None).GetAwaiter().GetResult(); throw new Exception("Expected CMD rejection."); }
+                try { router.CallAsync("RemoteCMD", new Dictionary<string, object> { { "command", "echo hi" } }, CancellationToken.None).GetAwaiter().GetResult(); throw new Exception("Expected CMD rejection."); }
                 catch (InvalidOperationException) { Assert(true, "DesktopTools blocks CMD when disabled"); }
                 // Storage gate is checked before the path even needs to exist.
-                try { router.CallAsync("file.read", new Dictionary<string, object> { { "path", @"C:\any.bin" } }, CancellationToken.None).GetAwaiter().GetResult(); throw new Exception("Expected storage-required rejection."); }
-                catch (InvalidOperationException) { Assert(true, "DesktopTools requires storage for file.read (no inline base64 backup)"); }
+                try { router.CallAsync("RemoteGetFile", new Dictionary<string, object> { { "path", @"C:\any.bin" } }, CancellationToken.None).GetAwaiter().GetResult(); throw new Exception("Expected storage-required rejection."); }
+                catch (InvalidOperationException) { Assert(true, "DesktopTools requires storage for RemoteGetFile (no inline base64 backup)"); }
 
                 // Logger writes next to the exe and trims when it grows past 1 MB.
                 var logFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MCPToolService.Log");
@@ -130,9 +130,9 @@ namespace WindowsToolService
                     try
                     {
                         var tools = new DesktopTools(storage);
-                        var uploaded = (Dictionary<string, object>)tools.CallAsync("file.read", new Dictionary<string, object> { { "path", uploadFile } }, CancellationToken.None).GetAwaiter().GetResult();
+                        var uploaded = (Dictionary<string, object>)tools.CallAsync("RemoteGetFile", new Dictionary<string, object> { { "path", uploadFile } }, CancellationToken.None).GetAwaiter().GetResult();
                         Assert((bool)uploaded["uploaded"] && !uploaded.ContainsKey("base64Data") && ((string)uploaded["url"]).StartsWith(bucket.Endpoint),
-                            "file.read uploads and returns a URL");
+                            "RemoteGetFile uploads and returns a URL");
                         using (var http = new System.Net.Http.HttpClient())
                         {
                             var downloaded = http.GetByteArrayAsync((string)uploaded["url"]).GetAwaiter().GetResult();
@@ -180,15 +180,17 @@ namespace WindowsToolService
         private static async Task NativeAsync()
         {
             var desktop = new DesktopTools(new AgentConfig { CloudUrl = "ws://127.0.0.1:4000", DeviceId = "native", DeviceName = "native", EnableCmd = true });
-            var windows = (Dictionary<string, object>)(await desktop.CallAsync("window.listWindows", new Dictionary<string, object>(), CancellationToken.None));
+            var windows = (Dictionary<string, object>)(await desktop.CallAsync("RemoteWindowsList", new Dictionary<string, object>(), CancellationToken.None));
             Assert((bool)windows["success"], "native window enumeration");
             var windowList = (System.Collections.IList)windows["windows"];
             var windowJson = new JavaScriptSerializer().Serialize(windowList);
             Assert(windowList.Count == 0 || (windowJson.Contains("\"processId\"") && windowJson.Contains("\"displayIndex\"") && windowJson.Contains("\"isMinimized\"")),
                 "window list includes process, state and monitor fields");
+            Assert(windowList.Count <= 15 && windows.ContainsKey("total") && windows.ContainsKey("offset") && windows.ContainsKey("count") && windows.ContainsKey("hasMore"),
+                "window list is paginated to 15 per page");
 
             // Screenshot requires storage; without it the call must fail instead of falling back to inline bytes.
-            try { await desktop.CallAsync("screenshot.capture", new Dictionary<string, object>(), CancellationToken.None); throw new Exception("Expected storage-required rejection."); }
+            try { await desktop.CallAsync("RemoteScreenshot", new Dictionary<string, object>(), CancellationToken.None); throw new Exception("Expected storage-required rejection."); }
             catch (InvalidOperationException) { Assert(true, "screenshot requires storage (no inline base64 fallback)"); }
 
             using (var bucket = new FakeBucket())
@@ -199,7 +201,7 @@ namespace WindowsToolService
                 var uploadTools = new DesktopTools(storage);
                 using (var http = new System.Net.Http.HttpClient())
                 {
-                    var screenshot = (Dictionary<string, object>)(await uploadTools.CallAsync("screenshot.capture", new Dictionary<string, object> { { "format", "png" } }, CancellationToken.None));
+                    var screenshot = (Dictionary<string, object>)(await uploadTools.CallAsync("RemoteScreenshot", new Dictionary<string, object> { { "format", "png" } }, CancellationToken.None));
                     Assert((bool)screenshot["uploaded"] && !screenshot.ContainsKey("base64Data") && ((string)screenshot["url"]).Contains("X-Amz-Signature"), "screenshot uploads and returns a URL");
                     var image = await http.GetByteArrayAsync((string)screenshot["url"]);
                     Assert(image.Length > 8 && image[0] == 137 && image[1] == 80 && (int)screenshot["width"] > 0, "native PNG screenshot");
@@ -207,11 +209,11 @@ namespace WindowsToolService
                         "screenshot attaches display + coordinate metadata");
                     Assert(new JavaScriptSerializer().Serialize(screenshot["displays"]).Contains("\"dpi\":"), "screenshot displays[] report per-monitor dpi");
 
-                    var jpegShot = (Dictionary<string, object>)(await uploadTools.CallAsync("screenshot.capture", new Dictionary<string, object> { { "format", "jpeg" }, { "quality", 70 } }, CancellationToken.None));
+                    var jpegShot = (Dictionary<string, object>)(await uploadTools.CallAsync("RemoteScreenshot", new Dictionary<string, object> { { "format", "jpeg" }, { "quality", 70 } }, CancellationToken.None));
                     var jpegBytes = await http.GetByteArrayAsync((string)jpegShot["url"]);
                     Assert(jpegBytes.Length > 3 && jpegBytes[0] == 0xFF && jpegBytes[1] == 0xD8 && (string)jpegShot["mimeType"] == "image/jpeg", "screenshot JPEG encoding");
 
-                    var scaledShot = (Dictionary<string, object>)(await uploadTools.CallAsync("screenshot.capture", new Dictionary<string, object> { { "format", "png" }, { "maxWidth", 320 } }, CancellationToken.None));
+                    var scaledShot = (Dictionary<string, object>)(await uploadTools.CallAsync("RemoteScreenshot", new Dictionary<string, object> { { "format", "png" }, { "maxWidth", 320 } }, CancellationToken.None));
                     Assert((int)scaledShot["width"] <= 320 && Convert.ToDouble(scaledShot["scale"]) <= 1.0, "screenshot downscales to maxWidth");
                 }
             }
@@ -250,7 +252,7 @@ namespace WindowsToolService
                     if (tool == "test.echo") return (object)args;
                     if (tool == "test.wait") { await Task.Delay(500, token); return (object)new { success = true }; }
                     if (tool == "test.stop") { cancellation.CancelAfter(100); return (object)new { success = true }; }
-                    if (tool == "cmd.execute") return await new WinPtyCommand().ExecuteAsync(args, token);
+                    if (tool == "RemoteCMD") return await new WinPtyCommand().ExecuteAsync(args, token);
                     throw new ArgumentException("Unsupported tool: " + tool);
                 }, Console.WriteLine);
                 await relay.RunAsync(cancellation.Token);

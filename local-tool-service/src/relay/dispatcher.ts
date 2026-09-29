@@ -60,7 +60,7 @@ function callTool(
       return services.keyboardService.keyPress(message.args as never);
     case "screenshot.capturePrimaryDisplay":
       return services.screenshotService.capturePrimaryDisplay();
-    case "window.listWindows":
+    case "RemoteWindowsList":
       return services.windowService.listWindows();
     default:
       throw new Error(`Unsupported tool: ${String((message as { tool: unknown }).tool)}`);

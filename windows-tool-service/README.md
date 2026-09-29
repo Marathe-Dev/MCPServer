@@ -108,12 +108,12 @@ owns launch/relaunch policy. Previously installed services are not automatically
 
 | MCP tool | Relay action | Arguments |
 | --- | --- | --- |
-| `mouse` | `mouse.move` / `mouse.click` / `mouse.scroll` / `mouse.drag` | `action`; `x`, `y`; `button`, `clickType`; `toX`, `toY` (drag); `amount`, `axis` (scroll) |
-| `keyboard` | `keyboard.typeText` / `keyboard.keyPress` | `action` (`type`/`press`); `text` or `keys` (e.g. `["ctrl", "s"]`) |
-| `screenshot` | `screenshot.capture` | `target` (`primary`/`virtual`/`display`/`window`), `displayIndex`, `windowTitle`, `format` (`auto`/`png`/`jpeg`), `quality`, `maxWidth` — requires storage configured (no inline base64 fallback) |
-| `get_window_list` | `window.listWindows` | — (visible windows with geometry, focus, `processName`/`processId`, min/max state, `displayIndex`; tool windows filtered) |
-| `cmd` | `cmd.execute` | `command`, optional `workingDirectory`, `timeoutMs`, `maxOutputChars` |
-| `get_file` | `file.read` | `path` (absolute); returns `url`, `name`, `size` — requires storage configured (no inline base64 fallback), files over 10 MB are rejected |
+| `mouse` | `mouse` | `action` (`move`/`click`/`scroll`/`drag`); `x`, `y`; `button`, `clickType`; `toX`, `toY` (drag); `amount`, `axis` (scroll) |
+| `keyboard` | `keyboard` | `action` (`type`/`press`); `text` or `keys` (e.g. `["ctrl", "s"]`) |
+| `screenshot` | `RemoteScreenshot` | `target` (`primary`/`virtual`/`display`/`window`), `displayIndex`, `windowTitle`, `format` (`auto`/`png`/`jpeg`), `quality`, `maxWidth` — requires storage configured (no inline base64 fallback) |
+| `get_window_list` | `RemoteWindowsList` | `offset` (default 0); 15 windows per page — visible windows with geometry, focus, `processName`/`processId`, min/max state, `displayIndex`; tool windows filtered; result carries `total`/`offset`/`count`/`hasMore` |
+| `cmd` | `RemoteCMD` | `command`, optional `workingDirectory`, `timeoutMs`, `maxOutputChars` |
+| `get_file` | `RemoteGetFile` | `path` (absolute); returns `url`, `name`, `size` — requires storage configured (no inline base64 fallback), files over 10 MB are rejected |
 
 Every relay action is dispatched by one `DesktopTools.CallAsync` switch. Results carry `success`, `backend` (`win32` or `winpty`), and an ISO `timestamp`. Key/mouse-button names match the existing TypeScript agent. The cloud server needs its own small rebuild to pick up the `cmd` and `get_file` tools:
 

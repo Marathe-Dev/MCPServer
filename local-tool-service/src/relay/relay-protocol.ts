@@ -10,7 +10,7 @@ export type RelayToolName =
   | "keyboard.typeText"
   | "keyboard.keyPress"
   | "screenshot.capturePrimaryDisplay"
-  | "window.listWindows";
+  | "RemoteWindowsList";
 
 export interface RegisterMessage {
   type: "register";

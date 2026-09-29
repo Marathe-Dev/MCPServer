@@ -93,7 +93,7 @@ Both channels implement the same tiny `IRelayChannel` interface (`ConnectAsync` 
 
 ### Why `register` and the 500 KB cap are mode-gated
 - The `register` handshake (`{type:"register", deviceId, deviceName, platform}`) is sent **only in cloud mode** — the Cloud MCP Server's `DeviceRegistry` needs it to route calls to this device, but RPCService already knows which machine it's talking to (it owns the pipe), so registering would be meaningless there.
-- The 500 KB result-size cap (`CapResult`) is the **cloud broker's** limit (its WebSocket message ceiling) — it's applied only in cloud mode. A local named pipe to RPCService has no such ceiling, so large results (e.g. a big `cmd.execute` output) pass through uncapped in rpc mode. `screenshot.capture`/`file.read` results are always small either way, since they return a presigned URL rather than inline bytes.
+- The 500 KB result-size cap (`CapResult`) is the **cloud broker's** limit (its WebSocket message ceiling) — it's applied only in cloud mode. A local named pipe to RPCService has no such ceiling, so large results (e.g. a big `RemoteCMD` output) pass through uncapped in rpc mode. `RemoteScreenshot`/`RemoteGetFile` results are always small either way, since they return a presigned URL rather than inline bytes.
 
 ## 6. Wire protocol (identical in both modes)
 
@@ -154,23 +154,20 @@ Single `switch` on the `tool` string; every branch returns a JSON-serializable o
 
 | Tool | Needs interactive desktop? | Notes |
 |---|---|---|
-| `cmd.execute` | WinPTY checks it itself | Requires `EnableCmd`; delegates to `WinPtyCommand.ExecuteAsync`. |
-| `file.read` | No | Uploads via `S3Presigner`; storage must be configured — no inline base64 fallback. |
-| `mouse.move` / `mouse.click` | Yes | `SetCursorPos` + `SendInput` (`mouse_event` flags). |
-| `mouse.scroll` | Yes | Wheel notches, vertical or horizontal. |
-| `mouse.drag` | Yes | Down at `(x,y)`, move to `(toX,toY)`, up. |
-| `keyboard.typeText` | Yes | Unicode key-down/up pairs per character. |
-| `keyboard.keyPress` | Yes | Resolves key names (letters, digits, F1–F24, aliases) to virtual-key codes; presses together, releases in reverse order (always releases, even on error). |
-| `screenshot.capture` | Yes | Captures primary/virtual/display-index/window-title region via GDI+; optional downscale; auto PNG↔JPEG by pixel count; uploads to storage (no inline base64 fallback). |
-| `window.listWindows` | Yes | Enumerates visible top-level windows (title, bounds, focus/min/max state, pid, process name, display index). |
+| `RemoteCMD` | WinPTY checks it itself | Requires `EnableCmd`; delegates to `WinPtyCommand.ExecuteAsync`. |
+| `RemoteGetFile` | No | Uploads via `S3Presigner`; storage must be configured — no inline base64 fallback. |
+| `mouse` | Yes | `action` (`move`/`click`/`scroll`/`drag`) selects the sub-behavior; `SetCursorPos` + `SendInput` (`mouse_event` flags), wheel notches, or down/move/up drag. |
+| `keyboard` | Yes | `action` (`type`/`press`) selects literal Unicode key-down/up pairs, or resolving key names (letters, digits, F1–F24, aliases) to virtual-key codes and pressing/releasing together (always releases, even on error). |
+| `RemoteScreenshot` | Yes | Captures primary/virtual/display-index/window-title region via GDI+; optional downscale; auto PNG↔JPEG by pixel count; uploads to storage (no inline base64 fallback). |
+| `RemoteWindowsList` | Yes | Enumerates visible top-level windows (title, bounds, focus/min/max state, pid, process name, display index). |
 
-`RequireInteractiveDesktop()` calls `OpenInputDesktop`/`SwitchDesktop` to fail fast with a clear error if the session is locked or on a secure desktop (UAC prompt, lock screen) — everything except `cmd.execute` and `file.read` needs this.
+`RequireInteractiveDesktop()` calls `OpenInputDesktop`/`SwitchDesktop` to fail fast with a clear error if the session is locked or on a secure desktop (UAC prompt, lock screen) — everything except `RemoteCMD` and `RemoteGetFile` needs this.
 
 ### CMD execution (`WinPtyCommand`)
 Spawns `cmd.exe /d /s /c "<command>"` inside a real WinPTY console (not simple pipe redirection, so interactive-style output behaves correctly), reads output on a background task, polls for exit every 25ms, and enforces `timeoutMs` (100–20,000, default 10,000). Output is capped at `maxOutputChars` (1,024–400,000, default 65,536). Result includes `exitCode`, `timedOut`, `truncated`, `durationMs`. Requires `winpty.dll` + `winpty-agent.exe` next to the EXE (fetched manually per [native/README.md](native/README.md), gitignored).
 
 ### File read / upload (`FileTools` + `S3Presigner`)
-Validates the path is absolute, exists, isn't a directory, and is ≤10 MB. Storage (`AgentConfig.StorageEnabled`, all five `E2Storage*` fields set) is **required** — the bytes are PUT to S3-compatible storage using a hand-rolled SigV4 presigner, and a presigned GET URL is returned; there is no inline-base64 fallback, so raw file/image bytes never pass through the relay or broker. Both `file.read` and `screenshot.capture` fail with a clear error if storage isn't configured.
+Validates the path is absolute, exists, isn't a directory, and is ≤10 MB. Storage (`AgentConfig.StorageEnabled`, all five `E2Storage*` fields set) is **required** — the bytes are PUT to S3-compatible storage using a hand-rolled SigV4 presigner, and a presigned GET URL is returned; there is no inline-base64 fallback, so raw file/image bytes never pass through the relay or broker. Both `RemoteGetFile` and `RemoteScreenshot` fail with a clear error if storage isn't configured.
 
 ## 9. Configuration reference (`AgentConfig`)
 
@@ -180,9 +177,9 @@ Validates the path is absolute, exists, isn't a directory, and is ≤10 MB. Stor
 | `CloudUrl` | `ws://`/`wss://` base URL for cloud mode (`/device-link` is appended automatically). |
 | `PipeName` | Named pipe name for rpc mode (default `RPCService.MCP.Relay`). |
 | `DeviceId` / `DeviceName` | Identity sent in `register` — required in cloud mode only. |
-| `EnableCmd` | Opt-in gate for `cmd.execute`; toggling it on in the UI requires confirming a warning dialog. |
+| `EnableCmd` | Opt-in gate for `RemoteCMD`; toggling it on in the UI requires confirming a warning dialog. |
 | `AutoConnectOnStartup` | Connect automatically when the window loads. |
-| `E2Storage*` (Endpoint/Region/Bucket/AccessKey/SecretKey) + `StorageGetTtlSeconds` | S3-compatible storage — **required** for `screenshot.capture` and `file.read` (no inline base64 fallback); all five must be set for `StorageEnabled` to be true. |
+| `E2Storage*` (Endpoint/Region/Bucket/AccessKey/SecretKey) + `StorageGetTtlSeconds` | S3-compatible storage — **required** for `RemoteScreenshot` and `RemoteGetFile` (no inline base64 fallback); all five must be set for `StorageEnabled` to be true. |
 
 Stored as JSON at `%LocalAppData%\WindowsMcpToolService\config.json`.
 

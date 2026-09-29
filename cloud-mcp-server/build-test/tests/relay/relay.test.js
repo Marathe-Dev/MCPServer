@@ -23,21 +23,15 @@ function fakeToolResult(message) {
             return ok({ success: args.command !== "exit /b 7", exitCode: args.command === "exit /b 7" ? 7 : 0,
                 output: "hello\r\n", timedOut: false, truncated: false, backend: FAKE_BACKEND, timestamp });
         }
-        case "mouse.move":
-        case "mouse.click": {
-            const { x, y } = message.args;
-            return ok({ success: true, x, y, backend: FAKE_BACKEND, timestamp });
+        case "mouse": {
+            const a = message.args;
+            if (a.action === "scroll")
+                return ok({ success: true, amount: a.amount, axis: a.axis, backend: FAKE_BACKEND, timestamp });
+            if (a.action === "drag")
+                return ok({ success: true, x: a.x, y: a.y, toX: a.toX, toY: a.toY, backend: FAKE_BACKEND, timestamp });
+            return ok({ success: true, x: a.x, y: a.y, backend: FAKE_BACKEND, timestamp });
         }
-        case "mouse.scroll": {
-            const { amount, axis } = message.args;
-            return ok({ success: true, amount, axis, backend: FAKE_BACKEND, timestamp });
-        }
-        case "mouse.drag": {
-            const { x, y, toX, toY } = message.args;
-            return ok({ success: true, x, y, toX, toY, backend: FAKE_BACKEND, timestamp });
-        }
-        case "keyboard.typeText":
-        case "keyboard.keyPress":
+        case "keyboard":
             return ok({ success: true, backend: FAKE_BACKEND, timestamp });
         case "screenshot.capture": {
             const a = message.args;
@@ -70,6 +64,10 @@ function fakeToolResult(message) {
                         title: "Fake Window", x: 0, y: 0, width: 800, height: 600, isFocused: true,
                         isMinimized: false, isMaximized: false, processId: 4242, processName: "fake", displayIndex: 0,
                     }],
+                total: 1,
+                offset: 0,
+                count: 1,
+                hasMore: false,
                 backend: FAKE_BACKEND,
                 timestamp,
             });
@@ -299,6 +297,10 @@ test("get_window_list relays the fake device's window list", async () => {
         assert.equal(parsed.windows[0].processName, "fake");
         assert.equal(parsed.windows[0].displayIndex, 0);
         assert.equal(parsed.windows[0].isMinimized, false);
+        assert.equal(parsed.total, 1);
+        assert.equal(parsed.offset, 0);
+        assert.equal(parsed.count, 1);
+        assert.equal(parsed.hasMore, false);
     });
 });
 test("keyboard type and press succeed through the relay", async () => {

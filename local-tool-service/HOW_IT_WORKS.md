@@ -125,7 +125,7 @@ The code, step by step in
    helper, which is a plain `switch` on `message.tool`
    (`"mouse.move"`, `"mouse.click"`, `"keyboard.typeText"`,
    `"keyboard.keyPress"`, `"screenshot.capturePrimaryDisplay"`,
-   `"window.listWindows"`) that calls the one matching real service method.
+   `"RemoteWindowsList"`) that calls the one matching real service method.
 3. Whatever that service method returns is wrapped as
    `{ type: "tool_result", requestId, ok: true, result }` and sent straight
    back over the same `RelayClient` socket.

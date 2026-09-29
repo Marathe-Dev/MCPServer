@@ -20,9 +20,7 @@ export function registerKeyboardTool(server: McpServer, deviceRegistry: DeviceRe
       }),
     },
     async ({ deviceId, action, text, keys }) => {
-      const tool = action === "type" ? "keyboard.typeText" : "keyboard.keyPress";
-      const args = action === "type" ? { text } : { keys };
-      const result = await deviceRegistry.sendRequest(deviceId, tool, args);
+      const result = await deviceRegistry.sendRequest(deviceId, "RemoteKeyboard", { action, text, keys });
       return { content: [{ type: "text", text: JSON.stringify(result) }] };
     },
   );

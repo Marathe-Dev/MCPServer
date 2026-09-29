@@ -18,7 +18,7 @@ export function registerGetFileTool(server: McpServer, deviceRegistry: DeviceReg
     },
     async ({ deviceId, path }) => {
       const result = await deviceRegistry.sendRequest<{ success: boolean; size?: number }>(
-        deviceId, "file.read", { path }, 60000,
+        deviceId, "RemoteGetFile", { path }, 60000,
       );
       if (result.success && typeof result.size === "number" && result.size > MAX_BYTES) {
         return {
