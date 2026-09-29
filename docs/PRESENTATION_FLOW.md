@@ -92,3 +92,53 @@ sequenceDiagram
 - Today: we already support local desktop access through a local MCP server.
 - Next: the cloud MCP server will become the central control plane for many devices.
 - Later: the same cloud server can also expose product web tools, account data, and internal services, so the user gets a single place to ask questions and act on both web and desktop resources.
+
+## 5. Production-ready flow (current implementation)
+
+This is the flow now built and running end-to-end — five components, from the AI agent down to the real desktop action and back. Unlike the models above, this one reuses the **existing RemotePC broker and RPCService** already deployed on every managed machine, instead of a new relay.
+
+```mermaid
+flowchart LR
+    Agent[AI Agent] -- "MCP call" --> MCPServer[Production MCP Server]
+    MCPServer -- "MESSAGE_TO (src: MCP)" --> Broker[RemotePC Broker]
+    Broker -- "routes by machine ID" --> RPCService["RPCService\n(RemotePCService.exe, on target PC)"]
+    RPCService -- "tool_call (named pipe)" --> WTS["windows-tool-service\n(WPF agent, same PC)"]
+    WTS --> OS["Real OS action\nmouse / keyboard / screenshot / cmd / file"]
+```
+
+### Step by step
+
+1. **AI Agent** calls a tool on the **MCP Server**, naming the target machine.
+2. **MCP Server** builds a `MESSAGE_TO` message (marked `src: "MCP"`) and sends it to the **RemotePC Broker** — the same broker already used for all other RemotePC traffic.
+3. **RemotePC Broker** routes the message to the correct machine, same as any other broker message.
+4. **RPCService** (the existing C++ Windows service already running on every managed PC) sees `src: "MCP"` and diverts the message to a local named pipe instead of handling it itself.
+5. **windows-tool-service** (a small WPF app running in the signed-in user's own desktop session) is the only thing on the other end of that pipe. It receives the tool call, actually performs it (mouse, keyboard, screenshot, CMD, file read), and sends the result back over the same pipe.
+6. The result travels back the exact same path in reverse: windows-tool-service → RPCService → Broker → MCP Server → AI Agent.
+
+### Why it's split this way
+
+- **RPCService** already runs as a Windows service with full system access on every machine — perfect for owning the local pipe, but services don't share the interactive user's desktop session, so it can't safely move the mouse or take a screenshot itself.
+- **windows-tool-service** runs *inside* the signed-in user's session — the only place that can actually control the desktop — but has no direct connection to the broker.
+- Together they give the AI agent full desktop control without either side taking on a job it can't safely do, and without needing any new infrastructure beyond what's already deployed.
+
+### Sequence view
+
+```mermaid
+sequenceDiagram
+    participant Agent as AI Agent
+    participant MCP as MCP Server
+    participant Broker as RemotePC Broker
+    participant RPC as RPCService (C++)
+    participant WTS as windows-tool-service
+
+    Agent->>MCP: Call tool (e.g. take a screenshot)
+    MCP->>Broker: MESSAGE_TO {src: "MCP", machine, tool, args}
+    Broker->>RPC: Route to target machine
+    RPC->>WTS: tool_call over local named pipe
+    WTS->>WTS: Perform the real action
+    WTS-->>RPC: tool_result over the pipe
+    RPC-->>Broker: MESSAGE_TO response
+    Broker-->>MCP: Deliver response
+    MCP-->>Agent: Tool result
+```
+
