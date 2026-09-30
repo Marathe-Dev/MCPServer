@@ -184,8 +184,8 @@ namespace WindowsToolService
             Assert((bool)windows["success"], "native window enumeration");
             var windowList = (System.Collections.IList)windows["windows"];
             var windowJson = new JavaScriptSerializer().Serialize(windowList);
-            Assert(windowList.Count == 0 || (windowJson.Contains("\"processId\"") && windowJson.Contains("\"displayIndex\"") && windowJson.Contains("\"isMinimized\"")),
-                "window list includes process, state and monitor fields");
+            Assert(windowList.Count == 0 || (windowJson.Contains("\"windowId\"") && windowJson.Contains("\"processId\"") && windowJson.Contains("\"displayIndex\"") && windowJson.Contains("\"isMinimized\"")),
+                "window list includes windowId, process, state and monitor fields");
             Assert(windowList.Count <= 15 && windows.ContainsKey("total") && windows.ContainsKey("offset") && windows.ContainsKey("count") && windows.ContainsKey("hasMore"),
                 "window list is paginated to 15 per page");
 
@@ -201,20 +201,21 @@ namespace WindowsToolService
                 var uploadTools = new DesktopTools(storage);
                 using (var http = new System.Net.Http.HttpClient())
                 {
-                    var screenshot = (Dictionary<string, object>)(await uploadTools.CallAsync("RemoteScreenshot", new Dictionary<string, object> { { "format", "png" } }, CancellationToken.None));
+                    var screenshot = (Dictionary<string, object>)(await uploadTools.CallAsync("RemoteScreenshot", new Dictionary<string, object>(), CancellationToken.None));
                     Assert((bool)screenshot["uploaded"] && !screenshot.ContainsKey("base64Data") && ((string)screenshot["url"]).Contains("X-Amz-Signature"), "screenshot uploads and returns a URL");
                     var image = await http.GetByteArrayAsync((string)screenshot["url"]);
-                    Assert(image.Length > 8 && image[0] == 137 && image[1] == 80 && (int)screenshot["width"] > 0, "native PNG screenshot");
-                    Assert(((System.Collections.IList)screenshot["displays"]).Count >= 1 && screenshot.ContainsKey("originX") && screenshot.ContainsKey("scale") && (string)screenshot["mimeType"] == "image/png",
-                        "screenshot attaches display + coordinate metadata");
-                    Assert(new JavaScriptSerializer().Serialize(screenshot["displays"]).Contains("\"dpi\":"), "screenshot displays[] report per-monitor dpi");
+                    Assert(image.Length > 8 && image[0] == 137 && image[1] == 80 && (int)screenshot["width"] > 0, "native PNG screenshot (default primary, high detail)");
+                    // Phase 0/1: native capture must equal the primary display's physical width (no hidden DPI downscale) -> pixels map 1:1.
+                    Assert((int)screenshot["width"] == System.Windows.Forms.Screen.PrimaryScreen.Bounds.Width, "native capture is 1:1 with the primary display");
+                    var shotJson = new JavaScriptSerializer().Serialize(screenshot);
+                    Assert(shotJson.Contains("\"coordinateSpace\"") && shotJson.Contains("\"scaleX\"") && shotJson.Contains("\"screenX\"") && (string)screenshot["mimeType"] == "image/png",
+                        "screenshot returns coordinateSpace mapping (native PNG)");
+                    Assert(shotJson.Contains("\"displayId\"") && shotJson.Contains("\"dpi\":"), "screenshot displays[] report displayId + dpi");
 
-                    var jpegShot = (Dictionary<string, object>)(await uploadTools.CallAsync("RemoteScreenshot", new Dictionary<string, object> { { "format", "jpeg" }, { "quality", 70 } }, CancellationToken.None));
+                    var jpegShot = (Dictionary<string, object>)(await uploadTools.CallAsync("RemoteScreenshot", new Dictionary<string, object> { { "detail", "low" } }, CancellationToken.None));
                     var jpegBytes = await http.GetByteArrayAsync((string)jpegShot["url"]);
-                    Assert(jpegBytes.Length > 3 && jpegBytes[0] == 0xFF && jpegBytes[1] == 0xD8 && (string)jpegShot["mimeType"] == "image/jpeg", "screenshot JPEG encoding");
-
-                    var scaledShot = (Dictionary<string, object>)(await uploadTools.CallAsync("RemoteScreenshot", new Dictionary<string, object> { { "format", "png" }, { "maxWidth", 320 } }, CancellationToken.None));
-                    Assert((int)scaledShot["width"] <= 320 && Convert.ToDouble(scaledShot["scale"]) <= 1.0, "screenshot downscales to maxWidth");
+                    Assert(jpegBytes.Length > 3 && jpegBytes[0] == 0xFF && jpegBytes[1] == 0xD8 && (string)jpegShot["mimeType"] == "image/jpeg", "screenshot low detail = JPEG");
+                    Assert((int)jpegShot["width"] <= 1280, "screenshot low detail downscales to <= 1280 wide");
                 }
             }
 

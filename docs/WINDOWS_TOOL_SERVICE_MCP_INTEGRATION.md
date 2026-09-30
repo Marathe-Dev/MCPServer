@@ -120,44 +120,47 @@ One tool for keyboard input; `args.action` selects `type` (literal text) or `pre
 **result:** *(envelope only)*
 
 ### 4.3 `RemoteScreenshot`
-Capture a screen region. **Requires storage to be configured on the device** (§4.7) — there is no inline-base64 fallback, so a misconfigured device fails clearly instead of flooding the relay with image bytes. The agent is Per-Monitor-V2 DPI aware, so this pixel space always matches `mouse` action=`move`/`click` input coordinates exactly, including across monitors with different scale factors.
+Capture a screen region. **Requires storage to be configured on the device** (§4.7) — there is no inline-base64 fallback, so a misconfigured device fails clearly instead of flooding the relay with image bytes. The agent forces Per-Monitor-V2 DPI awareness at startup, so at native detail the image pixels equal physical screen pixels **1:1** and match `mouse` input coordinates exactly, even at non-100% display scale or across mixed-DPI monitors.
 
 | args | type | required | notes |
 |---|---|---|---|
-| `target` | `"primary"` \| `"virtual"` \| `"display"` \| `"window"` | no | default `"virtual"` (whole multi-monitor desktop) |
-| `displayIndex` | integer | no | monitor index from a prior `displays[]`; defaults to `0` if omitted, even when `target="display"` |
-| `windowTitle` | string, ≤512 chars | only if `target="window"` | substring match, prefers the focused window — no sensible default, so this one is genuinely required in that case |
-| `format` | `"auto"` \| `"png"` \| `"jpeg"` | no | default `"auto"` — PNG for small frames, JPEG for large |
-| `quality` | integer 1–100 | no | JPEG only, default 80 |
-| `maxWidth` | integer 16–10000 | no | downscale so width ≤ this |
+| `target` | `"primary"` \| `"virtual"` \| `"display"` \| `"window"` | no | default `"primary"` (single display, crisp 1:1) |
+| `displayId` | string | only if `target="display"` | stable id from a prior `displays[].displayId` (e.g. `\\.\DISPLAY1`); falls back to `displayIndex` if given |
+| `windowId` | string | only if `target="window"` | hex handle from `RemoteWindowsList` (e.g. `0x000A1234`); falls back to `windowTitle` substring if given |
+| `detail` | `"low"` \| `"medium"` \| `"high"` | no | default `"high"` — server picks encoding/resolution: high = native PNG (crisp text), medium = PNG capped ~1920w, low = JPEG capped ~1280w |
 
 **result:**
 ```json
 {
   "format": "png|jpeg", "mimeType": "image/png|image/jpeg",
-  "width": 0, "height": 0, "originalWidth": 0, "originalHeight": 0, "scale": 1.0,
-  "originX": 0, "originY": 0,
-  "displays": [{ "index": 0, "x": 0, "y": 0, "width": 0, "height": 0, "isPrimary": true, "dpi": 96 }],
+  "width": 0, "height": 0,
+  "coordinateSpace": {
+    "imageWidth": 0, "imageHeight": 0,
+    "screenX": 0, "screenY": 0, "screenWidth": 0, "screenHeight": 0,
+    "scaleX": 1.0, "scaleY": 1.0
+  },
+  "displays": [{ "index": 0, "displayId": "\\.\\DISPLAY1", "name": "...", "x": 0, "y": 0, "width": 0, "height": 0, "isPrimary": true, "dpi": 96 }],
   "virtualBounds": { "x": 0, "y": 0, "width": 0, "height": 0 },
   "cursor": { "x": 0, "y": 0 },
   "uploaded": true, "size": 0, "url": "https://…presigned…"
 }
 ```
-> Map a screenshot pixel back to a real screen coordinate as `originX + pixelX / scale`. There is never a `base64Data` field — image bytes never travel over the relay/broker, only the presigned URL, and the image already has the system cursor drawn on it (no separate confirmation call needed). `displays[].dpi` is diagnostic only — coordinates are already consistent, you don't need to apply it yourself. If storage isn't configured, you'll get `ok:false, error:"Storage is not configured on this device. Configure storage to use RemoteScreenshot."`
+> Map an image pixel to a real screen coordinate with `coordinateSpace`: `screenX = coordinateSpace.screenX + imageX * scaleX` (and likewise for Y). At default `detail="high"` there is no downscale so `scaleX = scaleY = 1` — the image pixel **is** the screen coordinate. There is never a `base64Data` field on the wire; image bytes travel only via the presigned URL, and the cloud MCP server fetches that URL and returns the image inline to the model. The system cursor is drawn on the image. `displays[].dpi` is diagnostic only — you do not apply it. If storage isn't configured, you'll get `ok:false, error:"Storage is not configured on this device. Configure storage to use RemoteScreenshot."`
 
 ### 4.4 `RemoteWindowsList`
-List visible top-level windows, 15 per page.
+List visible top-level windows, 15 per page. Minimized and DWM-cloaked (hidden) windows are excluded unless `includeMinimized` is true.
 
 | args | type | required | notes |
 |---|---|---|---|
 | `offset` | integer ≥ 0 | no | default `0`; skip this many windows to get the next page |
+| `includeMinimized` | boolean | no | default `false`; include minimized/cloaked windows |
 
 **result:**
 ```json
 {
   "windows": [
     {
-      "title": "string", "x": 0, "y": 0, "width": 0, "height": 0,
+      "windowId": "0x000A1234", "title": "string", "x": 0, "y": 0, "width": 0, "height": 0,
       "isFocused": true, "isMinimized": false, "isMaximized": false,
       "processId": 0, "processName": "string", "displayIndex": 0
     }
@@ -165,7 +168,7 @@ List visible top-level windows, 15 per page.
   "total": 0, "offset": 0, "count": 0, "hasMore": false
 }
 ```
-> `windows` never has more than 15 entries. `total` is how many windows matched overall, `count` is how many are in this page, and `hasMore` tells you whether to call again with `offset` = previous `offset + count` to get the rest.
+> Pass `windowId` to `RemoteScreenshot` (`target="window"`) to capture a specific window deterministically — titles can be duplicated, ids can't. `windows` never has more than 15 entries; `total` is the overall match count, `count` is this page's size, and `hasMore` tells you whether to call again with `offset` = previous `offset + count`.
 
 ### 4.5 `RemoteCMD`
 Run one CMD command line through a real console (WinPTY) as the signed-in user.

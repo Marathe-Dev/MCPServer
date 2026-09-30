@@ -34,18 +34,9 @@ namespace WindowsToolService
 
         // ── Dispatch ──────────────────────────────────────────────────────────────
 
-        // Broker-facing tool name -> internal switch name. Add new aliases here only.
-        private static readonly Dictionary<string, string> ToolAliases = new Dictionary<string, string>
-        {
-            { "RemoteScreenshot", "RemoteScreenshot" },
-        };
-
         /// <summary>Routes one relay tool call to its handler and returns the result.</summary>
         internal async Task<object> CallAsync(string tool, IDictionary<string, object> args, CancellationToken token)
         {
-            // string mapped;
-            // if (ToolAliases.TryGetValue(tool, out mapped)) tool = mapped;
-
             switch (tool)
             {
                 // Remote command execution — opt-in; WinPTY runs its own desktop check.
@@ -274,13 +265,12 @@ namespace WindowsToolService
             return (key >= 33 && key <= 46) || key == 91 || key == 93 || key == 144 || key == 163 || key == 165 ? 1u : 0u;
         }
 
-        private const long AutoPngMaxPixels = 1000000;
         private const int WindowListPageSize = 15;
 
         /// <summary>Captures a target region and its metadata; encoded bytes come back via out params (no base64).</summary>
         private static Dictionary<string, object> CaptureCore(IDictionary<string, object> args, out byte[] bytes, out string mimeType, out string format)
         {
-            var target = Arguments.Choice(args, "target", "virtual", "primary", "virtual", "display", "window");
+            var target = Arguments.Choice(args, "target", "primary", "primary", "virtual", "display", "window");
             Rectangle source;
             switch (target)
             {
@@ -288,11 +278,10 @@ namespace WindowsToolService
                     source = SystemInformation.VirtualScreen;
                     break;
                 case "display":
-                    var screens = Screen.AllScreens;
-                    source = screens[Arguments.Integer(args, "displayIndex", 0, screens.Length - 1, 0)].Bounds;
+                    source = ResolveDisplay(args);
                     break;
                 case "window":
-                    source = WindowRect(Arguments.Text(args, "windowTitle", 512));
+                    source = ResolveWindow(args);
                     break;
                 default:
                     source = Screen.PrimaryScreen.Bounds;
@@ -300,9 +289,11 @@ namespace WindowsToolService
             }
             if (source.Width <= 0 || source.Height <= 0) throw new InvalidOperationException("Capture region is empty.");
 
-            var requestedFormat = Arguments.Choice(args, "format", "auto", "auto", "png", "jpeg");
-            var quality = Arguments.Integer(args, "quality", 1, 100, 80);
-            var maxWidth = args.ContainsKey("maxWidth") ? Arguments.Integer(args, "maxWidth", 16, 10000) : 0;
+            // The server picks encoding/size from a detail preset so the model never reasons about JPEG vs PNG.
+            var detail = Arguments.Choice(args, "detail", "high", "high", "medium", "low");
+            var jpeg = detail == "low";
+            var quality = 80;
+            var maxWidth = detail == "low" ? 1280 : detail == "medium" ? 1920 : 0;
 
             using (var full = new Bitmap(source.Width, source.Height, PixelFormat.Format24bppRgb))
             {
@@ -332,7 +323,6 @@ namespace WindowsToolService
                     }
 
                     // Auto keeps small/text frames as lossless PNG and switches large frames to JPEG to cut size.
-                    var jpeg = requestedFormat == "jpeg" || (requestedFormat == "auto" && (long)encoded.Width * encoded.Height > AutoPngMaxPixels);
                     using (var stream = new MemoryStream())
                     {
                         if (jpeg) SaveJpeg(encoded, stream, quality);
@@ -347,11 +337,18 @@ namespace WindowsToolService
                     result["mimeType"] = mimeType;
                     result["width"] = encoded.Width;
                     result["height"] = encoded.Height;
-                    result["originalWidth"] = source.Width;
-                    result["originalHeight"] = source.Height;
-                    result["scale"] = scale;
-                    result["originX"] = source.X;
-                    result["originY"] = source.Y;
+                    // Explicit image->screen mapping: screenX = coordinateSpace.screenX + imageX * scaleX (scaleX = 1 when not downscaled).
+                    result["coordinateSpace"] = new
+                    {
+                        imageWidth = encoded.Width,
+                        imageHeight = encoded.Height,
+                        screenX = source.X,
+                        screenY = source.Y,
+                        screenWidth = source.Width,
+                        screenHeight = source.Height,
+                        scaleX = (double)source.Width / encoded.Width,
+                        scaleY = (double)source.Height / encoded.Height
+                    };
                     result["displays"] = Displays();
                     var virtualScreen = SystemInformation.VirtualScreen;
                     result["virtualBounds"] = new { x = virtualScreen.X, y = virtualScreen.Y, width = virtualScreen.Width, height = virtualScreen.Height };
@@ -400,9 +397,67 @@ namespace WindowsToolService
             for (var i = 0; i < screens.Length; i++)
             {
                 var b = screens[i].Bounds;
-                displays.Add(new { index = i, x = b.X, y = b.Y, width = b.Width, height = b.Height, isPrimary = screens[i].Primary, dpi = MonitorDpi(b) });
+                displays.Add(new { index = i, displayId = screens[i].DeviceName, name = DisplayName(screens[i].DeviceName), x = b.X, y = b.Y, width = b.Width, height = b.Height, isPrimary = screens[i].Primary, dpi = MonitorDpi(b) });
             }
             return displays;
+        }
+
+        /// <summary>Resolves a display capture rect from a stable displayId (DeviceName), falling back to displayIndex.</summary>
+        private static Rectangle ResolveDisplay(IDictionary<string, object> args)
+        {
+            var screens = Screen.AllScreens;
+            if (args.ContainsKey("displayId"))
+            {
+                var id = Arguments.Text(args, "displayId", 64);
+                foreach (var s in screens) if (s.DeviceName == id) return s.Bounds;
+                throw new ArgumentException("No display with id: " + id);
+            }
+            return screens[Arguments.Integer(args, "displayIndex", 0, screens.Length - 1, 0)].Bounds;
+        }
+
+        /// <summary>Resolves a window capture rect from a stable windowId (HWND hex), falling back to a title substring.</summary>
+        private static Rectangle ResolveWindow(IDictionary<string, object> args)
+        {
+            if (args.ContainsKey("windowId"))
+            {
+                var handle = ParseHandle(Arguments.Text(args, "windowId", 32));
+                if (!IsWindow(handle)) throw new ArgumentException("No window with that windowId (it may have closed).");
+                Rect r;
+                if (!GetWindowRect(handle, out r)) throw new Win32Exception();
+                return Rectangle.FromLTRB(r.Left, r.Top, r.Right, r.Bottom);
+            }
+            return WindowRect(Arguments.Text(args, "windowTitle", 512));
+        }
+
+        /// <summary>Parses a "0x..." (or bare hex) window handle from get_window_list.</summary>
+        private static IntPtr ParseHandle(string id)
+        {
+            var hex = id.StartsWith("0x") || id.StartsWith("0X") ? id.Substring(2) : id;
+            long value;
+            if (!long.TryParse(hex, System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out value))
+                throw new ArgumentException("windowId must be a hex handle like 0x000A1234.");
+            return new IntPtr(value);
+        }
+
+        /// <summary>Friendly monitor/adapter name for a device, or the device name if unavailable.</summary>
+        private static string DisplayName(string deviceName)
+        {
+            var info = new DisplayDevice { cb = Marshal.SizeOf(typeof(DisplayDevice)) };
+            return EnumDisplayDevices(deviceName, 0, ref info, 0) && info.DeviceString.Length > 0 ? info.DeviceString : deviceName;
+        }
+
+        /// <summary>True when a window is DWM-cloaked (e.g. a virtual-desktop or suspended UWP window).</summary>
+        private static bool IsCloaked(IntPtr handle)
+        {
+            int cloaked;
+            return DwmGetWindowAttribute(handle, DWMWA_CLOAKED, out cloaked, sizeof(int)) == 0 && cloaked != 0;
+        }
+
+        /// <summary>Reads a boolean tool argument, defaulting to false when absent or malformed.</summary>
+        private static bool ArgFlag(IDictionary<string, object> args, string name)
+        {
+            object value;
+            return args.TryGetValue(name, out value) && value is bool && (bool)value;
         }
 
         /// <summary>Effective DPI for the monitor covering this rect; diagnostic only now that PerMonitorV2 keeps coordinates consistent.</summary>
@@ -459,11 +514,13 @@ namespace WindowsToolService
             var foreground = GetForegroundWindow();
             var screens = Screen.AllScreens;
             var names = new Dictionary<int, string>();
+            var includeMinimized = ArgFlag(args, "includeMinimized");
 
             EnumWindow callback = delegate(IntPtr handle, IntPtr parameter)
             {
                 if (!IsWindowVisible(handle)) return true;
                 if ((ExStyle(handle) & 0x00000080) != 0) return true; // skip WS_EX_TOOLWINDOW
+                if (!includeMinimized && (IsIconic(handle) || IsCloaked(handle))) return true; // skip minimized + cloaked ghosts
 
                 Rect bounds;
                 if (!GetWindowRect(handle, out bounds)) return true;
@@ -481,6 +538,7 @@ namespace WindowsToolService
                 GetWindowThreadProcessId(handle, out pid);
                 windows.Add(new
                 {
+                    windowId = "0x" + handle.ToInt64().ToString("X8"),
                     title = title.ToString(),
                     x = bounds.Left,
                     y = bounds.Top,
@@ -581,12 +639,23 @@ namespace WindowsToolService
         }
         [StructLayout(LayoutKind.Sequential)] private struct Rect { public int Left, Top, Right, Bottom; }
         [StructLayout(LayoutKind.Sequential)] private struct CursorInfo { public int Size; public int Flags; public IntPtr Cursor; public Point ScreenPos; }
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        private struct DisplayDevice
+        {
+            public int cb;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string DeviceName;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceString;
+            public int StateFlags;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceID;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceKey;
+        }
         private delegate bool EnumWindow(IntPtr handle, IntPtr parameter);
 
         private const int CURSOR_SHOWING = 0x1;
         private const int DI_NORMAL = 0x3;
         private const int MONITOR_DEFAULTTONEAREST = 2;
         private const int MDT_EFFECTIVE_DPI = 0;
+        private const int DWMWA_CLOAKED = 14;
 
         [DllImport("user32.dll", SetLastError = true)] private static extern bool SetCursorPos(int x, int y);
         [DllImport("user32.dll", SetLastError = true)] private static extern uint SendInput(uint count, Input[] inputs, int size);
@@ -607,6 +676,9 @@ namespace WindowsToolService
         [DllImport("user32.dll")] private static extern bool GetCursorInfo(out CursorInfo info);
         [DllImport("user32.dll")] private static extern bool DrawIconEx(IntPtr hdc, int x, int y, IntPtr icon, int width, int height, int frame, IntPtr flickerFreeDraw, int flags);
         [DllImport("user32.dll")] private static extern IntPtr MonitorFromRect(ref Rect rect, int flags);
+        [DllImport("user32.dll")] private static extern bool IsWindow(IntPtr handle);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern bool EnumDisplayDevices(string device, uint deviceNumber, ref DisplayDevice info, uint flags);
+        [DllImport("dwmapi.dll")] private static extern int DwmGetWindowAttribute(IntPtr handle, int attribute, out int value, int size);
         [DllImport("shcore.dll")] private static extern int GetDpiForMonitor(IntPtr monitor, int dpiType, out uint dpiX, out uint dpiY);
     }
 }

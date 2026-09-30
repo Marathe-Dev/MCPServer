@@ -17,7 +17,10 @@ export function registerKeyboardTool(server: McpServer, deviceRegistry: DeviceRe
         action: z.enum(["type", "press"]).describe("type = literal text; press = key combo"),
         text: z.string().max(20000).optional().describe("Text to type when action=type"),
         keys: z.array(z.string()).min(1).max(16).optional().describe('Keys to press together when action=press, e.g. ["ctrl", "s"]'),
-      }),
+      }).refine(
+        (a) => (a.action === "type" ? typeof a.text === "string" : Array.isArray(a.keys) && a.keys.length > 0),
+        { message: "action=type needs text; action=press needs keys." },
+      ),
     },
     async ({ deviceId, action, text, keys }) => {
       const result = await deviceRegistry.sendRequest(deviceId, "RemoteKeyboard", { action, text, keys });

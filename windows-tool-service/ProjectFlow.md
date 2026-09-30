@@ -158,8 +158,8 @@ Single `switch` on the `tool` string; every branch returns a JSON-serializable o
 | `RemoteGetFile` | No | Uploads via `S3Presigner`; storage must be configured — no inline base64 fallback. |
 | `mouse` | Yes | `action` (`move`/`click`/`scroll`/`drag`) selects the sub-behavior; `SetCursorPos` + `SendInput` (`mouse_event` flags), wheel notches, or down/move/up drag. |
 | `keyboard` | Yes | `action` (`type`/`press`) selects literal Unicode key-down/up pairs, or resolving key names (letters, digits, F1–F24, aliases) to virtual-key codes and pressing/releasing together (always releases, even on error). |
-| `RemoteScreenshot` | Yes | Captures primary/virtual/display-index/window-title region via GDI+; optional downscale; auto PNG↔JPEG by pixel count; uploads to storage (no inline base64 fallback). |
-| `RemoteWindowsList` | Yes | Enumerates visible top-level windows (title, bounds, focus/min/max state, pid, process name, display index). |
+| `RemoteScreenshot` | Yes | Captures primary (default)/virtual/display (by `displayId`)/window (by `windowId`) region via GDI+; `detail` preset picks PNG vs JPEG + downscale; returns `coordinateSpace` (1:1 at high detail); uploads to storage (no inline base64 fallback). |
+| `RemoteWindowsList` | Yes | Enumerates visible top-level windows (`windowId`, title, bounds, focus/min/max state, pid, process name, display index), 15/page; skips minimized + DWM-cloaked unless `includeMinimized`. |
 
 `RequireInteractiveDesktop()` calls `OpenInputDesktop`/`SwitchDesktop` to fail fast with a clear error if the session is locked or on a secure desktop (UAC prompt, lock screen) — everything except `RemoteCMD` and `RemoteGetFile` needs this.
 

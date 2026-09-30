@@ -13,6 +13,13 @@ namespace WindowsToolService
         private EventWaitHandle showEvent;
         private RegisteredWaitHandle registration;
 
+        static App()
+        {
+            // Belt-and-suspenders over the manifest: guarantees CopyFromScreen/SetCursorPos share one physical-pixel space on mixed-DPI monitors.
+            try { SetProcessDpiAwarenessContext(PerMonitorAwareV2); }
+            catch { /* Win10 < 1703 lacks the API; the manifest's dpiAware still applies. */ }
+        }
+
         protected override void OnStartup(StartupEventArgs args)
         {
             base.OnStartup(args);
@@ -89,5 +96,8 @@ namespace WindowsToolService
         }
 
         [DllImport("kernel32.dll", SetLastError = true)] private static extern bool SetDefaultDllDirectories(uint flags);
+
+        private static readonly IntPtr PerMonitorAwareV2 = new IntPtr(-4);
+        [DllImport("user32.dll")] private static extern bool SetProcessDpiAwarenessContext(IntPtr value);
     }
 }

@@ -110,8 +110,8 @@ owns launch/relaunch policy. Previously installed services are not automatically
 | --- | --- | --- |
 | `mouse` | `mouse` | `action` (`move`/`click`/`scroll`/`drag`); `x`, `y`; `button`, `clickType`; `toX`, `toY` (drag); `amount`, `axis` (scroll) |
 | `keyboard` | `keyboard` | `action` (`type`/`press`); `text` or `keys` (e.g. `["ctrl", "s"]`) |
-| `screenshot` | `RemoteScreenshot` | `target` (`primary`/`virtual`/`display`/`window`), `displayIndex`, `windowTitle`, `format` (`auto`/`png`/`jpeg`), `quality`, `maxWidth` — requires storage configured (no inline base64 fallback) |
-| `get_window_list` | `RemoteWindowsList` | `offset` (default 0); 15 windows per page — visible windows with geometry, focus, `processName`/`processId`, min/max state, `displayIndex`; tool windows filtered; result carries `total`/`offset`/`count`/`hasMore` |
+| `screenshot` | `RemoteScreenshot` | `target` (`primary` default/`virtual`/`display`/`window`), `displayId`, `windowId`, `detail` (`low`/`medium`/`high`) — requires storage configured (no inline base64 fallback) |
+| `get_window_list` | `RemoteWindowsList` | `offset` (default 0), `includeMinimized` (default false); 15 windows per page — visible windows with `windowId`, geometry, focus, `processName`/`processId`, min/max state, `displayIndex`; tool/minimized/cloaked windows filtered; result carries `total`/`offset`/`count`/`hasMore` |
 | `cmd` | `RemoteCMD` | `command`, optional `workingDirectory`, `timeoutMs`, `maxOutputChars` |
 | `get_file` | `RemoteGetFile` | `path` (absolute); returns `url`, `name`, `size` — requires storage configured (no inline base64 fallback), files over 10 MB are rejected |
 
@@ -124,24 +124,23 @@ npm --prefix cloud-mcp-server start
 
 Older TypeScript-based device agents still handle mouse move/click and keyboard type/press, but reject `cmd`, `get_file`, and mouse `scroll`/`drag` as unsupported.
 
-### Screenshots (multi-display, window, and compression)
+### Screenshots (multi-display, window, and detail presets)
 
-`screenshot` captures the whole `virtual` desktop (all monitors) by default, or just the
-`primary` display, a specific `display` (`displayIndex` from a prior capture's `displays[]`),
-or a `window` (`windowTitle` substring). Encoding is `auto` — PNG for small/text frames, JPEG
-for large ones — and you can force `format` (`png`/`jpeg`), set JPEG `quality`, or `maxWidth`
-to downscale before sending, which is the fastest way to shrink a 4K frame.
+`screenshot` captures the `primary` display by default (single monitor, crisp native 1:1), or a
+specific `display` (stable `displayId` from a prior capture's `displays[]`), a `window`
+(`windowId` from `get_window_list`), or the whole `virtual` desktop. Instead of raw format/quality
+knobs it takes a `detail` preset and the server picks encoding/resolution: `high` (default) =
+native PNG for crisp text, `medium` = PNG capped ~1920w, `low` = JPEG capped ~1280w.
 
-Every capture attaches coordinate metadata so input lands correctly on multi-monitor setups:
-`originX`/`originY` (the captured region's top-left in virtual-desktop space), `width`/`height`
-(encoded pixels), `originalWidth`/`originalHeight`, `scale`, `displays[]` (each with a diagnostic
-`dpi`), `virtualBounds`, and `cursor`. Convert an image pixel to a real input coordinate as
-`realX = originX + pixelX / scale` (and likewise for Y), then pass it to `mouse_move`/`mouse_click`.
-The agent is Per-Monitor-V2 DPI aware, so this pixel space always matches mouse input coordinates
-exactly, including across monitors with different scale factors. The captured image also has the
-system cursor drawn on it, so you can visually confirm pointer position without an extra round trip.
-The image is uploaded to storage and returned as a **presigned URL** — screenshots require storage
-configured the same as `get_file` (see below).
+Each capture returns a `coordinateSpace` object — `{ imageWidth, imageHeight, screenX, screenY,
+screenWidth, screenHeight, scaleX, scaleY }` — plus `displays[]` (each with `displayId`, `name`,
+diagnostic `dpi`), `virtualBounds`, and `cursor`. Convert an image pixel to a real input
+coordinate as `realX = coordinateSpace.screenX + imageX * scaleX` (likewise Y), then pass it to
+the `mouse` tool. The agent forces **Per-Monitor-V2** DPI awareness at startup, so at `detail=high`
+there is no downscale (`scaleX = scaleY = 1`) and the image pixel **is** the screen coordinate,
+even at non-100% display scale or across mixed-DPI monitors. The captured image also has the
+system cursor drawn on it. The image is uploaded to storage and returned as a **presigned URL**;
+the cloud MCP server fetches that URL and returns the image inline to the model.
 
 ### Presigned file uploads (storage — required)
 

@@ -30,17 +30,17 @@ function fakeToolResult(message: RelayRequestMessage): RelayMessage {
       return ok({ success: args.command !== "exit /b 7", exitCode: args.command === "exit /b 7" ? 7 : 0,
         output: "hello\r\n", timedOut: false, truncated: false, backend: FAKE_BACKEND, timestamp });
     }
-    case "mouse": {
+    case "RemoteMouse": {
       const a = message.args as { action: string; x?: number; y?: number; toX?: number; toY?: number; amount?: number; axis?: string };
       if (a.action === "scroll") return ok({ success: true, amount: a.amount, axis: a.axis, backend: FAKE_BACKEND, timestamp });
       if (a.action === "drag") return ok({ success: true, x: a.x, y: a.y, toX: a.toX, toY: a.toY, backend: FAKE_BACKEND, timestamp });
       return ok({ success: true, x: a.x, y: a.y, backend: FAKE_BACKEND, timestamp });
     }
-    case "keyboard":
+    case "RemoteKeyboard":
       return ok({ success: true, backend: FAKE_BACKEND, timestamp });
     case "RemoteScreenshot": {
-      const a = message.args as { format?: string };
-      const jpeg = a.format === "jpeg";
+      const a = message.args as { detail?: string };
+      const jpeg = a.detail === "low";
       return ok({
         success: true,
         format: jpeg ? "jpeg" : "png",
@@ -50,12 +50,8 @@ function fakeToolResult(message: RelayRequestMessage): RelayMessage {
         size: 1024,
         width: 1,
         height: 1,
-        originalWidth: 1,
-        originalHeight: 1,
-        scale: 1,
-        originX: 0,
-        originY: 0,
-        displays: [{ index: 0, x: 0, y: 0, width: 1920, height: 1080, isPrimary: true, dpi: 96 }],
+        coordinateSpace: { imageWidth: 1, imageHeight: 1, screenX: 0, screenY: 0, screenWidth: 1, screenHeight: 1, scaleX: 1, scaleY: 1 },
+        displays: [{ index: 0, displayId: "\\\\.\\DISPLAY1", name: "Generic Monitor", x: 0, y: 0, width: 1920, height: 1080, isPrimary: true, dpi: 96 }],
         virtualBounds: { x: 0, y: 0, width: 1920, height: 1080 },
         cursor: { x: 0, y: 0 },
         backend: FAKE_BACKEND,
@@ -66,7 +62,7 @@ function fakeToolResult(message: RelayRequestMessage): RelayMessage {
       return ok({
         success: true,
         windows: [{
-          title: "Fake Window", x: 0, y: 0, width: 800, height: 600, isFocused: true,
+          windowId: "0x00010001", title: "Fake Window", x: 0, y: 0, width: 800, height: 600, isFocused: true,
           isMinimized: false, isMaximized: false, processId: 4242, processName: "fake", displayIndex: 0,
         }],
         total: 1,
@@ -297,25 +293,34 @@ test("mouse scroll and drag relay through the fake device", async () => {
   });
 });
 
-test("screenshot forwards a presigned URL with no image bytes", async () => {
-  await withRegisteredDevice(async (client) => {
-    const png = await client.callTool({ name: "screenshot", arguments: { deviceId: DEVICE_ID } });
-    const content = png.content as Array<Record<string, unknown>>;
-    assert.ok(!content.some((c) => c.type === "image"));
-    const text = content.find((c) => c.type === "text") as { text: string };
-    const parsed = JSON.parse(text.text);
-    assert.equal(parsed.success, true);
-    assert.equal(parsed.width, 1);
-    assert.equal(parsed.originX, 0);
-    assert.ok(Array.isArray(parsed.displays) && parsed.displays.length >= 1 && parsed.displays[0].isPrimary === true);
-    assert.ok(typeof parsed.url === "string" && parsed.url.includes("X-Amz-Signature"));
-    assert.equal(parsed.base64Data, undefined);
-
-    const jpeg = await client.callTool({ name: "screenshot", arguments: { deviceId: DEVICE_ID, format: "jpeg" } });
-    const [jpegContent] = jpeg.content as Array<Record<string, unknown>>;
-    const jpegParsed = JSON.parse((jpegContent as { text: string }).text);
-    assert.equal(jpegParsed.mimeType, "image/jpeg");
-  });
+test("screenshot inlines the image and returns coordinateSpace mapping", async () => {
+  const pngBytes = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+    "base64",
+  );
+  const originalFetch = globalThis.fetch;
+  // Intercept the presigned URL so the cloud handler can inline real bytes without network.
+  globalThis.fetch = (async (input: unknown) =>
+    typeof input === "string" && input.includes("X-Amz-Signature")
+      ? new Response(pngBytes, { status: 200, headers: { "content-type": "image/png" } })
+      : originalFetch(input as never)) as typeof fetch;
+  try {
+    await withRegisteredDevice(async (client) => {
+      const res = await client.callTool({ name: "screenshot", arguments: { deviceId: DEVICE_ID } });
+      const content = res.content as Array<Record<string, unknown>>;
+      const image = content.find((c) => c.type === "image") as { data: string; mimeType: string };
+      assert.ok(image && typeof image.data === "string" && image.mimeType === "image/png");
+      const text = content.find((c) => c.type === "text") as { text: string };
+      const parsed = JSON.parse(text.text);
+      assert.equal(parsed.success, true);
+      assert.equal(parsed.coordinateSpace.scaleX, 1);
+      assert.equal(parsed.coordinateSpace.screenX, 0);
+      assert.ok(Array.isArray(parsed.displays) && typeof parsed.displays[0].displayId === "string");
+      assert.ok(typeof parsed.url === "string" && parsed.url.includes("X-Amz-Signature"));
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("get_window_list relays the fake device's window list", async () => {
@@ -328,6 +333,7 @@ test("get_window_list relays the fake device's window list", async () => {
     const parsed = JSON.parse(content.text);
     assert.equal(parsed.success, true);
     assert.ok(Array.isArray(parsed.windows) && parsed.windows.length === 1);
+    assert.equal(parsed.windows[0].windowId, "0x00010001");
     assert.equal(parsed.windows[0].title, "Fake Window");
     assert.equal(parsed.windows[0].processName, "fake");
     assert.equal(parsed.windows[0].displayIndex, 0);

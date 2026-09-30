@@ -1,11 +1,10 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { DeviceRegistry } from "../relay/device-registry.js";
 /**
- * `screenshot` — capture a device's screen (primary display, a specific display,
- * the whole virtual desktop, or a window) and upload it to storage, returning a
- * presigned download URL plus display + coordinate metadata so the agent can map
- * pixels to input coordinates. The server does not fetch the URL itself (cost); the
- * caller must fetch/view it before analyzing coordinates or clicking. Auto-compresses
- * large frames to JPEG. Extends the HopToDesk MCP tool of the same name.
+ * `screenshot` — capture a device's screen (primary display by default, a specific
+ * display, the whole virtual desktop, or a window) and return the image inline plus
+ * `coordinateSpace` metadata mapping image pixels to screen coordinates. The image is
+ * uploaded to storage; the cloud server fetches it and inlines it so the model sees it
+ * directly. Extends the HopToDesk MCP tool of the same name.
  */
 export declare function registerScreenshotTool(server: McpServer, deviceRegistry: DeviceRegistry): void;

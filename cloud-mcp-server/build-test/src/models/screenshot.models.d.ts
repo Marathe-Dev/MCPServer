@@ -8,13 +8,21 @@ export interface ScreenshotResult {
     size?: number;
     width: number;
     height: number;
-    originalWidth?: number;
-    originalHeight?: number;
-    scale?: number;
-    originX?: number;
-    originY?: number;
+    /** Explicit image->screen mapping: screenX = coordinateSpace.screenX + imageX * scaleX (scaleX = 1 when not downscaled). */
+    coordinateSpace?: {
+        imageWidth: number;
+        imageHeight: number;
+        screenX: number;
+        screenY: number;
+        screenWidth: number;
+        screenHeight: number;
+        scaleX: number;
+        scaleY: number;
+    };
     displays?: Array<{
         index: number;
+        displayId: string;
+        name: string;
         x: number;
         y: number;
         width: number;

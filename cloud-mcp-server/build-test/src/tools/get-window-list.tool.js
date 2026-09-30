@@ -6,13 +6,14 @@ import * as z from "zod/v4";
  */
 export function registerGetWindowListTool(server, deviceRegistry) {
     server.registerTool("get_window_list", {
-        description: "List visible windows with titles and positions on a specific device, 15 at a time. Response includes total/offset/count/hasMore — call again with a higher offset when hasMore is true to get the next page.",
+        description: "List visible windows with titles, positions and a stable windowId on a specific device, 15 at a time. Minimized/hidden windows are excluded unless includeMinimized is true. Response includes total/offset/count/hasMore — call again with a higher offset when hasMore is true to get the next page.",
         inputSchema: z.object({
             deviceId: z.string().min(1).describe("Target deviceId from list_devices; not the readable deviceName"),
             offset: z.number().int().min(0).default(0).describe("Skip this many windows; use previous offset + count when hasMore is true to get the next page"),
+            includeMinimized: z.boolean().default(false).describe("Include minimized and hidden/cloaked windows (excluded by default)"),
         }),
-    }, async ({ deviceId, offset }) => {
-        const result = await deviceRegistry.sendRequest(deviceId, "window.listWindows", { offset });
+    }, async ({ deviceId, offset, includeMinimized }) => {
+        const result = await deviceRegistry.sendRequest(deviceId, "RemoteWindowsList", { offset, includeMinimized });
         return { content: [{ type: "text", text: JSON.stringify(result) }] };
     });
 }

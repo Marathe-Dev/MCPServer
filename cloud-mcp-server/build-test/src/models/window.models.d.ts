@@ -1,4 +1,5 @@
 export interface WindowInfo {
+    windowId: string;
     title: string;
     x: number;
     y: number;

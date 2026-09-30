@@ -14,7 +14,7 @@
       },
       {
         "name": "screenshot",
-        "description": "Capture a device's screen as an image with display + coordinate metadata. Target the primary display, a specific display, the whole virtual desktop, or a window. Large frames auto-compress to JPEG. Map a pixel to a real coordinate as originX + pixelX / scale.",
+        "description": "Capture a device's screen and return the image plus coordinate metadata. Defaults to the primary display (crisp, native 1:1). Use target=display with displayId, target=window with windowId (both from get_window_list/prior screenshot), or target=virtual for all monitors. Map an image pixel to a screen coordinate with coordinateSpace: screenX = coordinateSpace.screenX + imageX * scaleX (scaleX = 1 unless downscaled). Pass that screen coordinate to the mouse tool.",
         "inputSchema": {
           "type": "object",
           "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -26,7 +26,7 @@
             },
             "target": {
               "default": "primary",
-              "description": "primary display, whole virtual desktop, a specific display, or a window",
+              "description": "primary display (default), all monitors (virtual), a specific display, or a window",
               "type": "string",
               "enum": [
                 "primary",
@@ -35,40 +35,27 @@
                 "window"
               ]
             },
-            "displayIndex": {
-              "description": "Monitor index (from a prior screenshot's displays[]) when target=display",
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 9007199254740991
-            },
-            "windowTitle": {
-              "description": "Window title substring when target=window",
+            "displayId": {
+              "description": "Stable display id from displays[].displayId; required when target=display",
               "type": "string",
               "minLength": 1,
-              "maxLength": 512
+              "maxLength": 64
             },
-            "format": {
-              "default": "auto",
-              "description": "auto = PNG for small frames, JPEG for large",
+            "windowId": {
+              "description": "Window id (hex handle) from get_window_list; required when target=window",
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32
+            },
+            "detail": {
+              "default": "high",
+              "description": "Detail level; the server picks encoding and resolution (high = native PNG, crisp text)",
               "type": "string",
               "enum": [
-                "auto",
-                "png",
-                "jpeg"
+                "low",
+                "medium",
+                "high"
               ]
-            },
-            "quality": {
-              "default": 80,
-              "description": "JPEG quality when JPEG is used",
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100
-            },
-            "maxWidth": {
-              "description": "Downscale so the image width is at most this many pixels",
-              "type": "integer",
-              "minimum": 16,
-              "maximum": 10000
             }
           },
           "required": [
@@ -78,7 +65,7 @@
       },
       {
         "name": "mouse",
-        "description": "Control a device's mouse. action=move (x,y); click (x,y,button,clickType); scroll (amount = ± notches, optional x,y and axis); drag (from x,y to toX,toY holding button). Coordinates are virtual-desktop pixels — map from a screenshot as originX + pixelX / scale.",
+        "description": "Control a device's mouse. Coordinates are absolute screen pixels — take an image pixel from a screenshot and map it with coordinateSpace: screenX = coordinateSpace.screenX + imageX * scaleX (identity when not downscaled). action=move/click use x,y; scroll uses amount with optional x,y; drag goes from x,y to toX,toY.",
         "inputSchema": {
           "type": "object",
           "$schema": "https://json-schema.org/draft/2020-12/schema",
