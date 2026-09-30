@@ -21,7 +21,7 @@ A borderless WPF desktop agent (.NET Framework 4.5, x64) that runs in a user's W
 | [RelayChannel.cs](RelayChannel.cs) | `IRelayChannel` abstraction plus its two implementations: `WebSocketRelayChannel` (cloud) and `PipeRelayChannel` (RPCService). |
 | [DesktopTools.cs](DesktopTools.cs) | The single tool dispatcher (`CallAsync`). Routes each tool name to its handler: Win32 mouse/keyboard, screenshot capture, window enumeration, CMD, file read. |
 | [WinPtyCommand.cs](WinPtyCommand.cs) | Runs one CMD line through WinPTY (a real console, not `Process.Start` redirection) with timeout + output cap. |
-| [FileTools.cs](FileTools.cs) | Reads a local file (validated, ≤10 MB) and uploads it via `S3Presigner`, returning a presigned URL. |
+| [tools/DesktopTools.GetFile.cs](tools/DesktopTools.GetFile.cs) | Reads a local file (validated, ≤10 MB) and uploads it via `S3Presigner`, returning a presigned URL. |
 | [S3Presigner.cs](S3Presigner.cs) | Minimal hand-rolled AWS SigV4 signer for S3-compatible storage (IDrive e2). Uploads bytes, returns a presigned GET URL. |
 | [Log.cs](Log.cs) | Append-only rotating log file (`MCPToolService.Log`) next to the EXE. Never throws. |
 | [ToolInfo.json](ToolInfo.json) | Reference copy of the MCP tool schemas (documentation for the tool set, not loaded at runtime). |
@@ -166,7 +166,7 @@ Single `switch` on the `tool` string; every branch returns a JSON-serializable o
 ### CMD execution (`WinPtyCommand`)
 Spawns `cmd.exe /d /s /c "<command>"` inside a real WinPTY console (not simple pipe redirection, so interactive-style output behaves correctly), reads output on a background task, polls for exit every 25ms, and enforces `timeoutMs` (100–20,000, default 10,000). Output is capped at `maxOutputChars` (1,024–400,000, default 65,536). Result includes `exitCode`, `timedOut`, `truncated`, `durationMs`. Requires `winpty.dll` + `winpty-agent.exe` next to the EXE (fetched manually per [native/README.md](native/README.md), gitignored).
 
-### File read / upload (`FileTools` + `S3Presigner`)
+### File read / upload (`DesktopTools.GetFile` + `S3Presigner`)
 Validates the path is absolute, exists, isn't a directory, and is ≤10 MB. Storage (`AgentConfig.StorageEnabled`, all five `E2Storage*` fields set) is **required** — the bytes are PUT to S3-compatible storage using a hand-rolled SigV4 presigner, and a presigned GET URL is returned; there is no inline-base64 fallback, so raw file/image bytes never pass through the relay or broker. Both `RemoteGetFile` and `RemoteScreenshot` fail with a clear error if storage isn't configured.
 
 ## 9. Configuration reference (`AgentConfig`)

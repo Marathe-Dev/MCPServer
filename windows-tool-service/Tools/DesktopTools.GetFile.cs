@@ -6,27 +6,28 @@ using System.Threading.Tasks;
 
 namespace WindowsToolService
 {
-    internal static class FileTools
+    /// <summary>Get-file tool: reads a local file (validated, ≤10 MB), uploads it, and returns a presigned URL.</summary>
+    internal sealed partial class DesktopTools
     {
         internal const long MaxFileBytes = 10L * 1024 * 1024;
 
         /// <summary>Reads a file, uploads it to storage, and returns a presigned download URL.</summary>
-        internal static async Task<object> UploadAsync(IDictionary<string, object> args, AgentConfig config, CancellationToken token)
+        private async Task<object> UploadFileAsync(IDictionary<string, object> args, CancellationToken token)
         {
             string full, name;
             var data = ReadBytes(args, out full, out name);
             var contentType = ContentType(name);
-            var key = "files/" + config.DeviceId + "/" + Guid.NewGuid().ToString("N") + "/" + SafeName(name);
-            var url = await new S3Presigner(config).UploadAsync(key, data, contentType, config.StorageGetTtlSeconds, token).ConfigureAwait(false);
+            var key = "files/" + _config.DeviceId + "/" + Guid.NewGuid().ToString("N") + "/" + SafeName(name);
+            var url = await new S3Presigner(_config).UploadAsync(key, data, contentType, _config.StorageGetTtlSeconds, token).ConfigureAwait(false);
 
-            var result = Envelope(full, name, data.Length);
+            var result = FileEnvelope(full, name, data.Length);
             result["contentType"] = contentType;
             result["uploaded"] = true;
             result["url"] = url;
             return result;
         }
 
-        private static Dictionary<string, object> Envelope(string full, string name, int size)
+        private static Dictionary<string, object> FileEnvelope(string full, string name, int size)
         {
             return new Dictionary<string, object>
             {

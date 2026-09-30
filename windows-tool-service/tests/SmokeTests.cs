@@ -71,24 +71,24 @@ namespace WindowsToolService
                 new RelayClient(config, (tool, arguments, token) => Task.FromResult<object>(null), Console.WriteLine);
                 Assert(System.Net.ServicePointManager.SecurityProtocol == System.Net.SecurityProtocolType.Tls12, "relay enables TLS 1.2");
                 var fileArgs = new Dictionary<string, object> { { "path", "relative\\path.txt" } };
-                Reject(() => { string f, n; FileTools.ReadBytes(fileArgs, out f, out n); }, "relative file path rejection");
+                Reject(() => { string f, n; DesktopTools.ReadBytes(fileArgs, out f, out n); }, "relative file path rejection");
                 var missing = new Dictionary<string, object> { { "path", @"C:\Windows\this-file-does-not-exist.smoketest" } };
-                try { string f, n; FileTools.ReadBytes(missing, out f, out n); throw new Exception("Expected file rejection."); }
+                try { string f, n; DesktopTools.ReadBytes(missing, out f, out n); throw new Exception("Expected file rejection."); }
                 catch (FileNotFoundException) { Assert(true, "missing file rejection"); }
                 var tempFile = Path.Combine(Path.GetTempPath(), "windows-tool-service-file-tools-" + Guid.NewGuid().ToString("N") + ".bin");
                 try
                 {
                     File.WriteAllBytes(tempFile, new byte[] { 0x4d, 0x43, 0x50, 0x00 });
                     string full, name;
-                    var data = FileTools.ReadBytes(new Dictionary<string, object> { { "path", tempFile } }, out full, out name);
+                    var data = DesktopTools.ReadBytes(new Dictionary<string, object> { { "path", tempFile } }, out full, out name);
                     Assert(data.Length == 4 && data[0] == 0x4d && name == Path.GetFileName(tempFile), "FileTools reads a small file");
                 }
                 finally { try { File.Delete(tempFile); } catch { } }
                 var oversized = Path.Combine(Path.GetTempPath(), "windows-tool-service-oversize-" + Guid.NewGuid().ToString("N") + ".bin");
                 try
                 {
-                    using (var stream = new FileStream(oversized, FileMode.CreateNew, FileAccess.Write)) { stream.SetLength(FileTools.MaxFileBytes + 1); }
-                    Reject(() => { string f, n; FileTools.ReadBytes(new Dictionary<string, object> { { "path", oversized } }, out f, out n); }, "10 MB file size rejection");
+                    using (var stream = new FileStream(oversized, FileMode.CreateNew, FileAccess.Write)) { stream.SetLength(DesktopTools.MaxFileBytes + 1); }
+                    Reject(() => { string f, n; DesktopTools.ReadBytes(new Dictionary<string, object> { { "path", oversized } }, out f, out n); }, "10 MB file size rejection");
                 }
                 finally { try { File.Delete(oversized); } catch { } }
 

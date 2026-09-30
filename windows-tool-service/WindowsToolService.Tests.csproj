@@ -31,7 +31,11 @@
     <Reference Include="PresentationFramework" />
     <Compile Include="AgentConfig.cs" />
     <Compile Include="DesktopTools.cs" />
-    <Compile Include="FileTools.cs" />
+    <Compile Include="tools\DesktopTools.Mouse.cs" />
+    <Compile Include="tools\DesktopTools.Keyboard.cs" />
+    <Compile Include="tools\DesktopTools.Screenshot.cs" />
+    <Compile Include="tools\DesktopTools.WindowList.cs" />
+    <Compile Include="tools\DesktopTools.GetFile.cs" />
     <Compile Include="S3Presigner.cs" />
     <Compile Include="Log.cs" />
     <Compile Include="RelayChannel.cs" />

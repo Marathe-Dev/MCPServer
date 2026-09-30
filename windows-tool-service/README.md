@@ -22,7 +22,7 @@ This is a normal user-session EXE. No Windows service or installation scripts ar
 | `RelayClient.cs` | WebSocket connection to the cloud server: register, ping/pong, reconnect backoff |
 | `DesktopTools.cs` | Single tool dispatcher — one `CallAsync` switch routes mouse/keyboard/screenshot/window input plus CMD and file reads |
 | `WinPtyCommand.cs` | Runs one CMD command per call via WinPTY, with timeout and output limits |
-| `FileTools.cs` | Reads a file (absolute path, capped at 10 MB) and uploads it to storage, returning a presigned URL |
+| `tools/DesktopTools.GetFile.cs` | Reads a file (absolute path, capped at 10 MB) and uploads it to storage, returning a presigned URL |
 
 ## Requirements
 
