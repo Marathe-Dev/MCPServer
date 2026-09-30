@@ -11,7 +11,8 @@ export type RelayToolName =
   | "RemoteWindowsList"
   | "RemoteCMD"
   | "RemoteGetFile"
-  | "RemoteRestart";
+  | "RemoteRestart"
+  | "RemoteUpdate";
 
 export interface RegisterMessage {
   type: "register";

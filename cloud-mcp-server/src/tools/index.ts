@@ -8,6 +8,7 @@ import { registerListDevicesTool } from "./list-devices.tool.js";
 import { registerCmdTool } from "./cmd.tool.js";
 import { registerGetFileTool } from "./get-file.tool.js";
 import { registerRestartTool } from "./restart.tool.js";
+import { registerUpdateTool } from "./update.tool.js";
 
 /** Registers every RemotePC MCP tool on the given server instance. */
 export function registerAllTools(
@@ -22,4 +23,5 @@ export function registerAllTools(
   registerCmdTool(server, deviceRegistry);
   registerGetFileTool(server, deviceRegistry);
   registerRestartTool(server, deviceRegistry);
+  registerUpdateTool(server, deviceRegistry);
 }

@@ -86,6 +86,8 @@ function fakeToolResult(message) {
                 ? { success: true, action, delaySeconds: args.delaySeconds, scheduledAt: timestamp, backend: FAKE_BACKEND, timestamp }
                 : { success: true, action, backend: FAKE_BACKEND, timestamp });
         }
+        case "RemoteUpdate":
+            return ok({ success: true, message: "Update started", backend: FAKE_BACKEND, timestamp });
         default:
             return {
                 type: "tool_result",
@@ -149,8 +151,9 @@ test("discovers all MCP tools through the relay", async () => {
             "mouse",
             "restart",
             "screenshot",
+            "update",
         ]);
-        const targeted = new Set(["cmd", "get_file", "get_window_list", "keyboard", "mouse", "restart", "screenshot"]);
+        const targeted = new Set(["cmd", "get_file", "get_window_list", "keyboard", "mouse", "restart", "screenshot", "update"]);
         for (const tool of tools.filter((tool) => targeted.has(tool.name))) {
             assert.ok(tool.inputSchema.required?.includes("deviceId"), tool.name);
             assert.ok(!Object.hasOwn(tool.inputSchema.properties ?? {}, "deviceName"), tool.name);
@@ -236,6 +239,16 @@ test("restart rejects a delaySeconds below the 5 second floor before relay", asy
     await withRegisteredDevice(async (client) => {
         const result = await client.callTool({ name: "restart", arguments: { deviceId: DEVICE_ID, delaySeconds: 1 } });
         assert.equal(result.isError, true);
+    });
+});
+test("update relays a started acknowledgement", async () => {
+    await withRegisteredDevice(async (client) => {
+        const result = await client.callTool({ name: "update", arguments: { deviceId: DEVICE_ID } });
+        const [content] = result.content;
+        const parsed = JSON.parse(content.text);
+        assert.equal(parsed.success, true);
+        assert.equal(parsed.message, "Update started");
+        assert.equal(result.isError, false);
     });
 });
 test("get_file relays a small file and rejects oversized results", async () => {
