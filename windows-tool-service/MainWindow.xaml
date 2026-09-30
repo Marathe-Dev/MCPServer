@@ -586,6 +586,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
@@ -626,14 +627,18 @@
                           Content="Allow remote CMD execution"
                           Style="{StaticResource CheckBoxStyle}"
                           Margin="0,2,0,6" Checked="EnableCmd_Checked" />
-                <CheckBox x:Name="autoConnect" Grid.Row="9" Grid.ColumnSpan="2"
+                <CheckBox x:Name="enableRestart" Grid.Row="9" Grid.ColumnSpan="2"
+                          Content="Allow remote restart"
+                          Style="{StaticResource CheckBoxStyle}"
+                          Margin="0,2,0,6" Checked="EnableRestart_Checked" />
+                <CheckBox x:Name="autoConnect" Grid.Row="10" Grid.ColumnSpan="2"
                           Content="Connect on startup"
                           Style="{StaticResource CheckBoxStyle}"
                           Margin="0,2,0,0" />
 
-                <Separator Grid.Row="10" Grid.ColumnSpan="2" Style="{StaticResource Divider}" />
+                <Separator Grid.Row="11" Grid.ColumnSpan="2" Style="{StaticResource Divider}" />
 
-                <Grid Grid.Row="11" Grid.ColumnSpan="2" Margin="0,0,0,6">
+                <Grid Grid.Row="12" Grid.ColumnSpan="2" Margin="0,0,0,6">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
@@ -645,7 +650,7 @@
                                TextTrimming="CharacterEllipsis" />
                 </Grid>
 
-                <TextBox x:Name="activity" Grid.Row="12" Grid.ColumnSpan="2"
+                <TextBox x:Name="activity" Grid.Row="13" Grid.ColumnSpan="2"
                          Style="{StaticResource LogBoxStyle}" />
             </Grid>
         </Border>

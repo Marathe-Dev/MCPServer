@@ -156,18 +156,22 @@ Single `switch` on the `tool` string; every branch returns a JSON-serializable o
 |---|---|---|
 | `RemoteCMD` | WinPTY checks it itself | Requires `EnableCmd`; delegates to `WinPtyCommand.ExecuteAsync`. |
 | `RemoteGetFile` | No | Uploads via `S3Presigner`; storage must be configured — no inline base64 fallback. |
+| `RemoteRestart` | No | Schedules/cancels a restart via `shutdown.exe`; requires `EnableRestart`. Replies before the reboot — `delaySeconds` (min 5, default 30) is the grace period. |
 | `mouse` | Yes | `action` (`move`/`click`/`scroll`/`drag`) selects the sub-behavior; `SetCursorPos` + `SendInput` (`mouse_event` flags), wheel notches, or down/move/up drag. |
 | `keyboard` | Yes | `action` (`type`/`press`) selects literal Unicode key-down/up pairs, or resolving key names (letters, digits, F1–F24, aliases) to virtual-key codes and pressing/releasing together (always releases, even on error). |
 | `RemoteScreenshot` | Yes | Captures primary (default)/virtual/display (by `displayId`)/window (by `windowId`) region via GDI+; `detail` preset picks PNG vs JPEG + downscale; returns `coordinateSpace` (1:1 at high detail); uploads to storage (no inline base64 fallback). |
 | `RemoteWindowsList` | Yes | Enumerates visible top-level windows (`windowId`, title, bounds, focus/min/max state, pid, process name, display index), 15/page; skips minimized + DWM-cloaked unless `includeMinimized`. |
 
-`RequireInteractiveDesktop()` calls `OpenInputDesktop`/`SwitchDesktop` to fail fast with a clear error if the session is locked or on a secure desktop (UAC prompt, lock screen) — everything except `RemoteCMD` and `RemoteGetFile` needs this.
+`RequireInteractiveDesktop()` calls `OpenInputDesktop`/`SwitchDesktop` to fail fast with a clear error if the session is locked or on a secure desktop (UAC prompt, lock screen) — everything except `RemoteCMD`, `RemoteGetFile` and `RemoteRestart` needs this.
 
 ### CMD execution (`WinPtyCommand`)
 Spawns `cmd.exe /d /s /c "<command>"` inside a real WinPTY console (not simple pipe redirection, so interactive-style output behaves correctly), reads output on a background task, polls for exit every 25ms, and enforces `timeoutMs` (100–20,000, default 10,000). Output is capped at `maxOutputChars` (1,024–400,000, default 65,536). Result includes `exitCode`, `timedOut`, `truncated`, `durationMs`. Requires `winpty.dll` + `winpty-agent.exe` next to the EXE (fetched manually per [native/README.md](native/README.md), gitignored).
 
 ### File read / upload (`DesktopTools.GetFile` + `S3Presigner`)
 Validates the path is absolute, exists, isn't a directory, and is ≤10 MB. Storage (`AgentConfig.StorageEnabled`, all five `E2Storage*` fields set) is **required** — the bytes are PUT to S3-compatible storage using a hand-rolled SigV4 presigner, and a presigned GET URL is returned; there is no inline-base64 fallback, so raw file/image bytes never pass through the relay or broker. Both `RemoteGetFile` and `RemoteScreenshot` fail with a clear error if storage isn't configured.
+
+### Restart (`DesktopTools.Restart`)
+Schedules or cancels a restart via `shutdown.exe` (`/r /t {delaySeconds}` or `/a` to cancel), gated by its own `EnableRestart` opt-in (separate from `EnableCmd`) and, unlike every other tool, **not** gated by `RequireInteractiveDesktop()` — it must work on a locked/logged-out machine. `shutdown.exe` only *schedules* the reboot and exits almost instantly, so the handler returns (and the ack reaches the caller) well before Windows actually restarts — `delaySeconds` (floor 5, default 30) is the mandatory grace period that guarantees this. Argument construction is split into a pure `BuildArguments` method so it's unit-testable without ever spawning `shutdown.exe` in CI.
 
 ## 9. Configuration reference (`AgentConfig`)
 

@@ -61,6 +61,7 @@ namespace WindowsToolService
                 name.Text = _config.DeviceName;
                 pipeName.Text = _config.PipeName;
                 enableCmd.IsChecked = _config.EnableCmd;
+                enableRestart.IsChecked = _config.EnableRestart;
                 autoConnect.IsChecked = _config.AutoConnectOnStartup;
 
                 if (_config.EffectiveConnectionMode == "rpc") 
@@ -126,6 +127,24 @@ namespace WindowsToolService
             }
         }
 
+        /// <summary>Warns before enabling remote restart; reverts the checkbox if declined.</summary>
+        private void EnableRestart_Checked(object sender, RoutedEventArgs e)
+        {
+            if (!_initialized) return;
+
+            const string message = "The connected relay will be able to reboot this machine, dropping the connection until it comes back " +
+                                   "up. Use only a trusted, access-controlled relay. Allow remote restart?";
+            if (MessageBox.Show(this, message, "Remote restart access", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            {
+                enableRestart.IsChecked = false;
+                Log.Write("Remote restart access declined.");
+            }
+            else
+            {
+                Log.Write("Remote restart access enabled.");
+            }
+        }
+
         // ── Connect / disconnect ──────────────────────────────────────────────
 
         /// <summary>Saves the settings and starts the relay loop on a background task.</summary>
@@ -142,6 +161,7 @@ namespace WindowsToolService
                 _config.PipeName = pipeName.Text.Trim();
                 _config.ConnectionMode = modeRpc.IsChecked == true ? "rpc" : "cloud";
                 _config.EnableCmd = enableCmd.IsChecked == true;
+                _config.EnableRestart = enableRestart.IsChecked == true;
                 _config.AutoConnectOnStartup = autoConnect.IsChecked == true;
                 _config.Save();
 
@@ -206,7 +226,7 @@ namespace WindowsToolService
         private void SetControls(bool stopped)
         {
             var enabled = stopped && !_closing;
-            enableCmd.IsEnabled = autoConnect.IsEnabled =
+            enableCmd.IsEnabled = enableRestart.IsEnabled = autoConnect.IsEnabled =
                 connect.IsEnabled = modeCloud.IsEnabled = modeRpc.IsEnabled = enabled;
             disconnect.IsEnabled = !stopped && !_closing;
             ApplyModeEnablement(enabled); // owns cloud/deviceId/name/pipeName per mode

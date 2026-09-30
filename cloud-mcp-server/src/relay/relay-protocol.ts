@@ -10,7 +10,8 @@ export type RelayToolName =
   | "RemoteScreenshot"
   | "RemoteWindowsList"
   | "RemoteCMD"
-  | "RemoteGetFile";
+  | "RemoteGetFile"
+  | "RemoteRestart";
 
 export interface RegisterMessage {
   type: "register";

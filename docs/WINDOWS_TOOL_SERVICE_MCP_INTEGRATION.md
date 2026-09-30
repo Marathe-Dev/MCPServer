@@ -211,6 +211,23 @@ Read a file from the device's local disk. **Requires storage to be configured on
 ### 4.7 Storage is mandatory for `RemoteScreenshot` and `RemoteGetFile`
 Both tools always upload their bytes to S3-compatible storage on the device and return a presigned URL — **there is no inline-base64 mode at all**, by design, so file/image bytes never pass through the broker or MCP server. This means every machine that needs to serve these two tools must have storage configured locally in `windows-tool-service` (`E2StorageEndpoint`/`E2StorageRegion`/`E2StorageBucket`/`E2StorageAccessKey`/`E2StorageSecretKey`) — that's a local agent configuration concern, not something the MCP server sends per call. If it's missing, expect `ok:false` with the errors quoted above instead of a result.
 
+### 4.8 `RemoteRestart`
+Schedules (or cancels) a restart of the device. **Requires local opt-in** (`EnableRestart`, separate from CMD) — no manifest/broker override. Does **not** require an interactive desktop; it must work on a locked or logged-out machine.
+
+**The reply always arrives before the reboot.** The agent schedules the restart via `shutdown.exe` (which returns almost instantly after scheduling) and replies with the ack immediately — the actual reboot only happens `delaySeconds` later. Do not wait for a second message; there isn't one — the device simply goes offline once it reboots and reconnects on its own afterward.
+
+| args | type | required | notes |
+|---|---|---|---|
+| `action` | `"restart"` \| `"cancel"` | no | default `"restart"`; `"cancel"` aborts a pending restart (`shutdown /a`) |
+| `delaySeconds` | integer, 5–3600 | no | default `30`; **minimum 5** — this is the grace period that guarantees the ack reaches you before the machine goes down |
+| `force` | boolean | no | default `false`; force-closes running apps without warning about unsaved changes |
+| `message` | string, ≤512 chars | no | shown to anyone signed in before the restart |
+
+**result (restart):** `{ action: "restart", delaySeconds, scheduledAt }` — `scheduledAt` is the UTC time the reboot is expected to happen.
+**result (cancel):** `{ action: "cancel" }`
+
+> If disabled, you'll get `ok:false, error:"Restart is disabled. Enable remote restart in the agent window."`. If `shutdown.exe` rejects the request (e.g. a restart is already pending, or `cancel` with none pending), you'll get `ok:false` with `shutdown.exe`'s exit code.
+
 ---
 
 ## 5. Every tool requiring desktop input can fail with one common error
@@ -227,7 +244,7 @@ Both tools always upload their bytes to S3-compatible storage on the device and 
 
 ## 6. Checklist for the backend team
 
-1. Add MCP tool definitions for whichever of the 6 identifiers in §4 you want to expose to the AI agent (`mouse` and `keyboard` are already consolidated with an `action` enum — see the reference schema in [windows-tool-service/ToolInfo.json](../windows-tool-service/ToolInfo.json) — as long as your handler ultimately emits the exact `message_details.type` + `args` shape from §4).
+1. Add MCP tool definitions for whichever of the 7 identifiers in §4 you want to expose to the AI agent (`mouse` and `keyboard` are already consolidated with an `action` enum — see the reference schema in [windows-tool-service/ToolInfo.json](../windows-tool-service/ToolInfo.json) — as long as your handler ultimately emits the exact `message_details.type` + `args` shape from §4).
 2. When a tool is invoked, build the `MESSAGE_TO` envelope from §2 with `src:"MCP"`, `type` = the exact identifier, and `args` matching that tool's schema — no extra/renamed fields.
 3. Send it to the broker targeting the desired `to_machine_id`/`to_username`; wait for the correlated response using `requestId`, with the timeout from §3.
 4. On `ok:true`, return `result` to the caller; on `ok:false`, surface `error` as a tool failure (not a transport error) — do not retry automatically except for the `"Agent busy"` case.

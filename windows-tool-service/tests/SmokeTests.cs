@@ -99,6 +99,16 @@ namespace WindowsToolService
                 // Storage gate is checked before the path even needs to exist.
                 try { router.CallAsync("RemoteGetFile", new Dictionary<string, object> { { "path", @"C:\any.bin" } }, CancellationToken.None).GetAwaiter().GetResult(); throw new Exception("Expected storage-required rejection."); }
                 catch (InvalidOperationException) { Assert(true, "DesktopTools requires storage for RemoteGetFile (no inline base64 backup)"); }
+                try { router.CallAsync("RemoteRestart", new Dictionary<string, object>(), CancellationToken.None).GetAwaiter().GetResult(); throw new Exception("Expected restart rejection."); }
+                catch (InvalidOperationException) { Assert(true, "DesktopTools blocks restart when disabled"); }
+
+                // Argument building is pure (no process spawn) so it's safe to test without ever rebooting the machine.
+                int delay;
+                Assert(DesktopTools.BuildArguments(new Dictionary<string, object>(), out delay) == "/r /t 30" && delay == 30, "restart defaults to /r /t 30");
+                Assert(DesktopTools.BuildArguments(new Dictionary<string, object> { { "force", true }, { "message", "brb" } }, out delay) == "/r /t 30 /f /c \"brb\"",
+                    "restart force + message build the expected flags");
+                Assert(DesktopTools.BuildArguments(new Dictionary<string, object> { { "action", "cancel" } }, out delay) == "/a", "restart cancel maps to /a");
+                Reject(() => { int d; DesktopTools.BuildArguments(new Dictionary<string, object> { { "delaySeconds", 1 } }, out d); }, "restart delaySeconds below the 5s floor is rejected");
 
                 // Logger writes next to the exe and trims when it grows past 1 MB.
                 var logFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MCPToolService.Log");

@@ -12,6 +12,7 @@ namespace WindowsToolService
         public string DeviceId { get; set; }
         public string DeviceName { get; set; }
         public bool EnableCmd { get; set; }
+        public bool EnableRestart { get; set; }
         public bool AutoConnectOnStartup { get; set; }
 
         /// <summary>"cloud" = direct WebSocket to the Cloud MCP Server (testing); "rpc" = local named pipe to RPCService (production).</summary>

@@ -72,6 +72,12 @@ namespace WindowsToolService
                 case "RemoteScreenshot": RequireInteractiveDesktop(); return await CaptureAsync(args, token).ConfigureAwait(false);
                 case "RemoteWindowsList": RequireInteractiveDesktop(); return Windows(args);
 
+                // Restart — opt-in, separate from CMD; no desktop required (must work on a locked/logged-out machine).
+                case "RemoteRestart":
+                    if (!_config.EnableRestart)
+                        throw new InvalidOperationException("Restart is disabled. Enable remote restart in the agent window.");
+                    return Restart(args);
+
                 default:
                     throw new ArgumentException("Unsupported tool: " + tool);
             }

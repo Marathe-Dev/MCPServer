@@ -84,6 +84,15 @@ function fakeToolResult(message: RelayRequestMessage): RelayMessage {
       }
       return ok({ success: true, path, name: "hello.txt", size: 5, base64Data: Buffer.from("hello").toString("base64"), backend: FAKE_BACKEND, timestamp });
     }
+    case "RemoteRestart": {
+      const args = message.args as { action?: string; delaySeconds?: number };
+      const action = args.action ?? "restart";
+      return ok(
+        action === "restart"
+          ? { success: true, action, delaySeconds: args.delaySeconds, scheduledAt: timestamp, backend: FAKE_BACKEND, timestamp }
+          : { success: true, action, backend: FAKE_BACKEND, timestamp },
+      );
+    }
     default:
       return {
         type: "tool_result",
@@ -163,9 +172,10 @@ test("discovers all MCP tools through the relay", async () => {
       "keyboard",
       "list_devices",
       "mouse",
+      "restart",
       "screenshot",
     ]);
-    const targeted = new Set(["cmd", "get_file", "get_window_list", "keyboard", "mouse", "screenshot"]);
+    const targeted = new Set(["cmd", "get_file", "get_window_list", "keyboard", "mouse", "restart", "screenshot"]);
     for (const tool of tools.filter((tool) => targeted.has(tool.name))) {
       assert.ok(tool.inputSchema.required?.includes("deviceId"), tool.name);
       assert.ok(!Object.hasOwn(tool.inputSchema.properties ?? {}, "deviceName"), tool.name);
@@ -236,6 +246,28 @@ test("cmd rejects multiline input and excessive timeout before relay", async () 
       const result = await client.callTool({ name: "cmd", arguments: { deviceId: DEVICE_ID, ...args } });
       assert.equal(result.isError, true);
     }
+  });
+});
+
+test("restart schedules with a default delay and forwards cancel", async () => {
+  await withRegisteredDevice(async (client) => {
+    const scheduled = await client.callTool({ name: "restart", arguments: { deviceId: DEVICE_ID } });
+    const [scheduledContent] = scheduled.content as Array<{ text: string }>;
+    const scheduledParsed = JSON.parse(scheduledContent.text);
+    assert.equal(scheduledParsed.success, true);
+    assert.equal(scheduledParsed.action, "restart");
+    assert.equal(scheduledParsed.delaySeconds, 30);
+
+    const cancelled = await client.callTool({ name: "restart", arguments: { deviceId: DEVICE_ID, action: "cancel" } });
+    const [cancelledContent] = cancelled.content as Array<{ text: string }>;
+    assert.equal(JSON.parse(cancelledContent.text).action, "cancel");
+  });
+});
+
+test("restart rejects a delaySeconds below the 5 second floor before relay", async () => {
+  await withRegisteredDevice(async (client) => {
+    const result = await client.callTool({ name: "restart", arguments: { deviceId: DEVICE_ID, delaySeconds: 1 } });
+    assert.equal(result.isError, true);
   });
 });
 

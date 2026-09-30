@@ -114,6 +114,7 @@ owns launch/relaunch policy. Previously installed services are not automatically
 | `get_window_list` | `RemoteWindowsList` | `offset` (default 0), `includeMinimized` (default false); 15 windows per page — visible windows with `windowId`, geometry, focus, `processName`/`processId`, min/max state, `displayIndex`; tool/minimized/cloaked windows filtered; result carries `total`/`offset`/`count`/`hasMore` |
 | `cmd` | `RemoteCMD` | `command`, optional `workingDirectory`, `timeoutMs`, `maxOutputChars` |
 | `get_file` | `RemoteGetFile` | `path` (absolute); returns `url`, `name`, `size` — requires storage configured (no inline base64 fallback), files over 10 MB are rejected |
+| `restart` | `RemoteRestart` | `action` (`restart` default/`cancel`), `delaySeconds` (5–3600, default 30), `force`, `message` — requires local opt-in (`EnableRestart`); replies before the reboot happens, no interactive desktop required |
 
 Every relay action is dispatched by one `DesktopTools.CallAsync` switch. Results carry `success`, `backend` (`win32` or `winpty`), and an ISO `timestamp`. Key/mouse-button names match the existing TypeScript agent. The cloud server needs its own small rebuild to pick up the `cmd` and `get_file` tools:
 
