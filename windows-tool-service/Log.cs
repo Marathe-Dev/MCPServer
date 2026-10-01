@@ -18,7 +18,7 @@ namespace WindowsToolService
         /// <summary>The log lives in the running executable's own directory.</summary>
         private static string LogPath
         {
-            get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MCPToolService.Log"); }
+            get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),"RemotePC", "MCPToolService.Log"); }
         }
 
         /// <summary>Appends a timestamped line; swallows every error.</summary>

@@ -14,8 +14,7 @@ namespace WindowsToolService
     /// </summary>
     internal sealed partial class DesktopTools
     {
-        private const string ChatExePath = @"C:\Program Files (x86)\RemotePC\RPCChat.exe";
-        private const string ChatUsername = "Remote AI Agent";
+        private const string ChatExePath = @"C:\Program Files (x86)\RemotePC\RemotePCPerformance\RpcApp\Tools\RPCChat.exe";
         private const string ChatSessionId = "MCPChatSession"; // fixed: only one MCP chat window is ever active at a time
         private const int WM_COPYDATA = 0x004A;
 
@@ -38,11 +37,13 @@ namespace WindowsToolService
             if (string.IsNullOrWhiteSpace(message))
                 throw new ArgumentException("message must not be empty.");
 
+            var agentName = args.ContainsKey("agentName") ? $"{Arguments.Text(args, "agentName", 50)} AI Agent" : "Remote AI Agent";
+
             var hwnd = ActiveChatWindowHandle();
             if (hwnd != IntPtr.Zero)
                 SendCopyData(hwnd, message);
             else
-                LaunchChatWindow(message);
+                LaunchChatWindow(message, agentName);
 
             return Result();
         }
@@ -59,11 +60,13 @@ namespace WindowsToolService
             catch (InvalidOperationException) { return IntPtr.Zero; } // process exited between calls
         }
 
-        private static void LaunchChatWindow(string message)
+        private static void LaunchChatWindow(string message, string agentName)
         {
             var arguments = "action=mcp_chat&machine_id=" + ChatSessionId +
-                "&username=" + Base64UrlEncode(ChatUsername) +
+                "&remote_machine_name=" + Uri.EscapeDataString(agentName) +
+                "&eventPrefix=" + "RPC" +
                 "&message=" + Base64UrlEncode(message);
+
             _chatProcess = Process.Start(new ProcessStartInfo(ChatExePath, arguments) { UseShellExecute = false });
         }
 

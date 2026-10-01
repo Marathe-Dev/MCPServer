@@ -11,13 +11,14 @@ export function registerSendChatMessageTool(server: McpServer, deviceRegistry: D
         "The host can read it but cannot reply. Calling it again while the window is still open appends another message to the same window.",
       inputSchema: z.object({
         deviceId: z.string().min(1).describe("Target deviceId from list_devices; not the readable deviceName"),
-        message: z.string().min(1).max(4000).describe("Message text to display to the host"),
+        message: z.string().min(1).max(150).describe("Message text to display to the host (max 150 chars)"),
+        agentName: z.string().max(50).describe("Name of the AI agent sending the message (e.g., 'Claude', 'ChatGPT', 'Gemini')"),
       }),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
-    async ({ deviceId, message }) => {
+    async ({ deviceId, message, agentName }) => {
       const result = await deviceRegistry.sendRequest<{ success: boolean }>(
-        deviceId, "RemoteChatMessage", { message }, 15000,
+        deviceId, "RemoteChatMessage", { message, agentName }, 15000,
       );
       return {
         content: [{ type: "text", text: JSON.stringify(result) }],
