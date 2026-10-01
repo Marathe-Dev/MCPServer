@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Security.Principal;
 using System.Text;
 using System.Web.Script.Serialization;
 
@@ -55,6 +56,8 @@ namespace WindowsToolService
 
         internal static AgentConfig Load()
         {
+            Log.Write($"AgentConfig Config path : {ConfigPath}");
+
             var config = File.Exists(ConfigPath)  // C:\Users\Hemanth\AppData\Local\WindowsMcpToolService\config.json
                 ? new JavaScriptSerializer().Deserialize<AgentConfig>(File.ReadAllText(ConfigPath))
                 : new AgentConfig { CloudUrl = "ws://127.0.0.1:4000", DeviceId = Guid.NewGuid().ToString(), DeviceName = Environment.MachineName };

@@ -12,7 +12,8 @@ export type RelayToolName =
   | "RemoteCMD"
   | "RemoteGetFile"
   | "RemoteRestart"
-  | "RemoteUpdate";
+  | "RemoteUpdate"
+  | "RemoteChatMessage";
 
 export interface RegisterMessage {
   type: "register";

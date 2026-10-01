@@ -9,6 +9,7 @@ import { registerCmdTool } from "./cmd.tool.js";
 import { registerGetFileTool } from "./get-file.tool.js";
 import { registerRestartTool } from "./restart.tool.js";
 import { registerUpdateTool } from "./update.tool.js";
+import { registerSendChatMessageTool } from "./chat-message.tool.js";
 
 /** Registers every RemotePC MCP tool on the given server instance. */
 export function registerAllTools(
@@ -24,4 +25,5 @@ export function registerAllTools(
   registerGetFileTool(server, deviceRegistry);
   registerRestartTool(server, deviceRegistry);
   registerUpdateTool(server, deviceRegistry);
+  registerSendChatMessageTool(server, deviceRegistry);
 }

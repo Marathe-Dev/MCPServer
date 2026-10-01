@@ -72,6 +72,9 @@ namespace WindowsToolService
                 case "RemoteScreenshot": RequireInteractiveDesktop(); return await CaptureAsync(args, token).ConfigureAwait(false);
                 case "RemoteWindowsList": RequireInteractiveDesktop(); return Windows(args);
 
+                // Chat — view-only window for the host user; no desktop lock check (must still work on a locked screen).
+                case "RemoteChatMessage": return SendChatMessage(args);
+
                 // Restart — opt-in, separate from CMD; no desktop required (must work on a locked/logged-out machine).
                 case "RemoteRestart":
                     if (!_config.EnableRestart)
