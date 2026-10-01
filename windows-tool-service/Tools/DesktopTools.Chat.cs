@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -14,9 +16,12 @@ namespace WindowsToolService
     /// </summary>
     internal sealed partial class DesktopTools
     {
-        private const string ChatExePath = @"C:\Program Files (x86)\RemotePC\RemotePCPerformance\RpcApp\Tools\RPCChat.exe";
         private const string ChatSessionId = "MCPChatSession"; // fixed: only one MCP chat window is ever active at a time
+        private const string ChatViewerName = "Remote AI Agent";
         private const int WM_COPYDATA = 0x004A;
+
+        private const string RPC_INI_SEC_GEN = "General Settings";
+        private const string RPC_MCP_CHAT_MESSAGE = "MCP_Chat_Message";
 
         private static Process _chatProcess;
 
@@ -34,14 +39,15 @@ namespace WindowsToolService
         private static object SendChatMessage(IDictionary<string, object> args)
         {
             var message = Arguments.Text(args, "message", 4000);
+
             if (string.IsNullOrWhiteSpace(message))
                 throw new ArgumentException("message must not be empty.");
 
-            var agentName = args.ContainsKey("agentName") ? $"{Arguments.Text(args, "agentName", 50)} AI Agent" : "Remote AI Agent";
+            var agentName = args.ContainsKey("agentName") ? $"{Arguments.Text(args, "agentName", 50)} AI Agent" : ChatViewerName;
 
             var hwnd = ActiveChatWindowHandle();
             if (hwnd != IntPtr.Zero)
-                SendCopyData(hwnd, message);
+                SendCopyData(hwnd, message, agentName);
             else
                 LaunchChatWindow(message, agentName);
 
@@ -62,20 +68,32 @@ namespace WindowsToolService
 
         private static void LaunchChatWindow(string message, string agentName)
         {
-            var arguments = "action=mcp_chat&machine_id=" + ChatSessionId +
-                "&remote_machine_name=" + Uri.EscapeDataString(agentName) +
-                "&eventPrefix=" + "RPC" +
-                "&message=" + Base64UrlEncode(message);
-
-            _chatProcess = Process.Start(new ProcessStartInfo(ChatExePath, arguments) { UseShellExecute = false });
-        }
-
-        private static void SendCopyData(IntPtr hwnd, string message)
-        {
-            var ptr = Marshal.StringToHGlobalUni(message);
             try
             {
-                var cds = new COPYDATASTRUCT { dwData = IntPtr.Zero, cbData = (message.Length + 1) * 2, lpData = ptr };
+                ConfigurationIniFile.GetInstance.Write(RPC_MCP_CHAT_MESSAGE, Base64UrlEncode(message), RPC_INI_SEC_GEN);
+
+                string ChatExePath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), @"RemotePCPerformance\RpcApp\Tools\RPCChat.exe");
+
+                var arguments = "action=mcp_chat&machine_id=" + ChatSessionId +
+                    "&remote_machine_name=" + Uri.EscapeDataString(ChatViewerName) +
+                    "&mcp_agentName=" + Uri.EscapeDataString(agentName) +
+                    "&eventPrefix=" + ProductInfo.PrefixForGlobalEvents;
+
+                _chatProcess = Process.Start(new ProcessStartInfo(ChatExePath, arguments) { UseShellExecute = false });
+            }
+            catch (Exception ex)
+            {
+                Log.Write($"DesktopTools.Chats - LaunchChatWindow : {ex}");
+            }
+        }
+
+        private static void SendCopyData(IntPtr hwnd, string message, string agentName)
+        {
+            var payload = agentName + "|" + message;
+            var ptr = Marshal.StringToHGlobalUni(payload);
+            try
+            {
+                var cds = new COPYDATASTRUCT { dwData = IntPtr.Zero, cbData = (payload.Length + 1) * 2, lpData = ptr };
                 SendMessage(hwnd, WM_COPYDATA, IntPtr.Zero, ref cds);
             }
             finally { Marshal.FreeHGlobal(ptr); }

@@ -15,10 +15,12 @@ namespace WindowsToolService
         private const int KeepBytes = 512 * 1024;    // keep the most recent 512 KB
         private static readonly object Gate = new object();
 
+        public const string RPC_INI_FILE_NAME = "MCPToolService.Log";
+
         /// <summary>The log lives in the running executable's own directory.</summary>
         private static string LogPath
         {
-            get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),"RemotePC", "MCPToolService.Log"); }
+            get { return Path.Combine(App.AppDataFolderPath, "MCPToolService.Log"); }
         }
 
         /// <summary>Appends a timestamped line; swallows every error.</summary>

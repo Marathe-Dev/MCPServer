@@ -30,6 +30,7 @@
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
     <Compile Include="Common\AgentConfig.cs" />
+    <Compile Include="Common\LaunchArguments.cs" />
     <Compile Include="DesktopTools.cs" />
     <Compile Include="Tools\DesktopTools.Mouse.cs" />
     <Compile Include="Tools\DesktopTools.Keyboard.cs" />

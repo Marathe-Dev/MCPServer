@@ -1,15 +1,26 @@
 using System;
 using System.Diagnostics;
+using System.Reflection;
+using System.Runtime;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
 
 namespace WindowsToolService
 {
+    public static class ProductInfo
+    {
+        public static string PrefixForGlobalEvents = "RPC";
+        public static string Name = "RemotePC";
+        public static string ExePrefix = "RPC";
+    }
+
     public partial class App : Application
     {
+        public static string ProductName = string.Empty;
+        public static string AppDataFolderPath = string.Empty;
+
         private Mutex instanceMutex;
-        private bool ownsMutex;
         private EventWaitHandle showEvent;
         private RegisteredWaitHandle registration;
 
@@ -22,6 +33,8 @@ namespace WindowsToolService
 
         protected override void OnStartup(StartupEventArgs args)
         {
+            Debugger.Launch();
+
             base.OnStartup(args);
             if (!Environment.UserInteractive || Process.GetCurrentProcess().SessionId == 0)
             {
@@ -32,47 +45,70 @@ namespace WindowsToolService
 
             try
             {
-                if (args.Args.Length != 0)
-                    throw new ArgumentException("Launch this desktop agent without command-line arguments.");
+                LaunchArguments.Instance.Parse(args.Args);
 
                 SetDefaultDllDirectories(0x00000200 | 0x00000800);
-                instanceMutex = new Mutex(false, @"Local\WindowsMcpToolService.Agent");
 
-                try 
-                { 
-                    ownsMutex = instanceMutex.WaitOne(0); 
+                string eventPrefix = ProductInfo.PrefixForGlobalEvents = LaunchArguments.Instance.EventPrefix;
+                string exePath = Assembly.GetExecutingAssembly().Location;
+
+                App.ProductName = exePath.Contains($"{ProductInfo.Name} Host") ? $"{ProductInfo.Name} Host" :       // RemotePC Host 
+                                  ProductInfo.Name;                                                                 // RemotePC
+
+                App.AppDataFolderPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) + "\\" + App.ProductName;
+
+                string MutexName = @"Local\" + eventPrefix + "WindowsMcpToolService.Agent";
+                string ShowToolEvent = @"Local\" + eventPrefix + "WindowsMcpToolService.Show";
+
+                showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowToolEvent);
+
+                bool createdNew = true;
+                instanceMutex = new Mutex(true, MutexName, out createdNew);
+
+                if (createdNew)
+                {
+                    try
+                    {
+                        string CommandLine = " ";
+                        foreach (string s in args.Args)
+                            CommandLine += s;
+
+                        Log.Write("### ---->> Starting The MCP tool Service <<---- ###");
+                        Log.Write($"Main CommandLine : {CommandLine}");
+                        Log.Write($"Main : ExecutingPath : {exePath}");
+                        Log.Write($"Main : ProductName : {App.ProductName}");
+                        Log.Write($"Main : EventPrefix : {eventPrefix}");
+
+                        var window = new MainWindow();
+                        MainWindow = window;
+
+                        registration = ThreadPool.RegisterWaitForSingleObject(showEvent, delegate
+                        {
+                            if (!Dispatcher.HasShutdownStarted)
+                                Dispatcher.BeginInvoke(new Action(window.ShowForeground));
+                        }, null, Timeout.Infinite, false);
+
+                        window.Show();
+
+                        Log.Write("Agent started.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Write("App : @E Exception : " + ex.Message);
+                        Shutdown(1);
+                    }
                 }
-                catch (AbandonedMutexException) 
-                { 
-                    ownsMutex = true; 
-                }
-
-                showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\WindowsMcpToolService.Show");
-
-                if (!ownsMutex)
+                else
                 {
                     Log.Write("Another agent instance is already running; bringing it forward.");
                     showEvent.Set();
                     Shutdown();
                     return;
                 }
-
-                var window = new MainWindow();
-                MainWindow = window;
-
-                registration = ThreadPool.RegisterWaitForSingleObject(showEvent, delegate
-                {
-                    if (!Dispatcher.HasShutdownStarted)
-                        Dispatcher.BeginInvoke(new Action(window.ShowForeground));
-                }, null, Timeout.Infinite, false);
-
-                window.Show();
-                Log.Write("Agent started.");
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                Log.Write("Startup failed", error);
-                MessageBox.Show(error.Message, "Windows MCP Tool Service", MessageBoxButton.OK, MessageBoxImage.Error);
+                Log.Write("App : @E Startup Exception : " + ex.Message, ex);
                 Shutdown(1);
             }
         }
@@ -85,11 +121,11 @@ namespace WindowsToolService
             if (showEvent != null) 
                 showEvent.Dispose();
 
-            if (ownsMutex) 
-                instanceMutex.ReleaseMutex();
-
-            if (instanceMutex != null) 
+            if (instanceMutex != null)
+            {
+                try { instanceMutex.ReleaseMutex(); } catch (ApplicationException) { /* not owned; already released */ }
                 instanceMutex.Dispose();
+            }
 
             Log.Write("Agent exited.");
             base.OnExit(args);
