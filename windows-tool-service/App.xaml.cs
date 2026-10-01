@@ -33,7 +33,7 @@ namespace WindowsToolService
 
         protected override void OnStartup(StartupEventArgs args)
         {
-            Debugger.Launch();
+            //Debugger.Launch();
 
             base.OnStartup(args);
             if (!Environment.UserInteractive || Process.GetCurrentProcess().SessionId == 0)
