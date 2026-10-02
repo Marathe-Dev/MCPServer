@@ -52,7 +52,7 @@
     <DefineConstants>TRACE</DefineConstants>
   </PropertyGroup>
   <PropertyGroup>
-    <ApplicationIcon>MCP_Service.ico</ApplicationIcon>
+    <ApplicationIcon>Resources\remotepc_noBorder.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -81,14 +81,22 @@
     <Compile Include="App.xaml.cs">
       <DependentUpon>App.xaml</DependentUpon>
     </Compile>
-    <Compile Include="AgentConfig.cs" />
+    <Compile Include="Common\AgentConfig.cs" />
+    <Compile Include="Common\IniFile.cs" />
+    <Compile Include="Common\LaunchArguments.cs" />
     <Compile Include="DesktopTools.cs" />
-    <Compile Include="FileTools.cs" />
-    <Compile Include="S3Presigner.cs" />
+    <Compile Include="Tools\DesktopTools.Mouse.cs" />
+    <Compile Include="Tools\DesktopTools.Keyboard.cs" />
+    <Compile Include="Tools\DesktopTools.Screenshot.cs" />
+    <Compile Include="Tools\DesktopTools.WindowList.cs" />
+    <Compile Include="Tools\DesktopTools.GetFile.cs" />
+    <Compile Include="Tools\DesktopTools.Restart.cs" />
+    <Compile Include="Tools\DesktopTools.Chat.cs" />
+    <Compile Include="Common\S3Presigner.cs" />
     <Compile Include="Log.cs" />
-    <Compile Include="RelayChannel.cs" />
-    <Compile Include="RelayClient.cs" />
-    <Compile Include="WinPtyCommand.cs" />
+    <Compile Include="RelayChannel\RelayChannel.cs" />
+    <Compile Include="RelayChannel\RelayClient.cs" />
+    <Compile Include="Tools\DesktopTools.Command.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
     </Compile>
@@ -97,8 +105,8 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include=".gitignore" />
-    <Content Include="icons8-service-100.ico" />
-    <Content Include="MCP_Service.ico" />
+    <Content Include="Resources\remotepc_noBorder.ico" />
+    <Content Include="Resources\MCP_Service.ico" />
     <Content Include="native\winpty.dll" Condition="Exists('native\winpty.dll')">
       <Link>winpty.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

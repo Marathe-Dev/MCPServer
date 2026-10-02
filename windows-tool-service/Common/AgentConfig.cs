@@ -51,14 +51,14 @@ namespace WindowsToolService
 
         internal static string ConfigPath
         {
-            get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WindowsMcpToolService", "config.json"); }
+            get { return Path.Combine(App.AppDataFolderPath, "MCPToolConfig.json"); }
         }
 
         internal static AgentConfig Load()
         {
             Log.Write($"AgentConfig Config path : {ConfigPath}");
 
-            var config = File.Exists(ConfigPath)  // C:\Users\Hemanth\AppData\Local\WindowsMcpToolService\config.json
+            var config = File.Exists(ConfigPath)  // "C:\ProgramData\RemotePC\MCPToolConfig.json"
                 ? new JavaScriptSerializer().Deserialize<AgentConfig>(File.ReadAllText(ConfigPath))
                 : new AgentConfig { CloudUrl = "ws://127.0.0.1:4000", DeviceId = Guid.NewGuid().ToString(), DeviceName = Environment.MachineName };
 

@@ -49,7 +49,9 @@ namespace WindowsToolService
 
                 SetDefaultDllDirectories(0x00000200 | 0x00000800);
 
-                string eventPrefix = ProductInfo.PrefixForGlobalEvents = LaunchArguments.Instance.EventPrefix;
+                if(!string.IsNullOrEmpty(LaunchArguments.Instance.EventPrefix))
+                    ProductInfo.PrefixForGlobalEvents = LaunchArguments.Instance.EventPrefix;
+
                 string exePath = Assembly.GetExecutingAssembly().Location;
 
                 App.ProductName = exePath.Contains($"{ProductInfo.Name} Host") ? $"{ProductInfo.Name} Host" :       // RemotePC Host 
@@ -57,8 +59,8 @@ namespace WindowsToolService
 
                 App.AppDataFolderPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) + "\\" + App.ProductName;
 
-                string MutexName = @"Local\" + eventPrefix + "WindowsMcpToolService.Agent";
-                string ShowToolEvent = @"Local\" + eventPrefix + "WindowsMcpToolService.Show";
+                string MutexName = @"Local\" + ProductInfo.PrefixForGlobalEvents + "WindowsMcpToolService.Agent";
+                string ShowToolEvent = @"Local\" + ProductInfo.PrefixForGlobalEvents + "WindowsMcpToolService.Show";
 
                 showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowToolEvent);
 
@@ -77,7 +79,7 @@ namespace WindowsToolService
                         Log.Write($"Main CommandLine : {CommandLine}");
                         Log.Write($"Main : ExecutingPath : {exePath}");
                         Log.Write($"Main : ProductName : {App.ProductName}");
-                        Log.Write($"Main : EventPrefix : {eventPrefix}");
+                        Log.Write($"Main : EventPrefix : {ProductInfo.PrefixForGlobalEvents}");
 
                         var window = new MainWindow();
                         MainWindow = window;
