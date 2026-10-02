@@ -8,7 +8,7 @@ namespace WindowsToolService
     internal sealed partial class DesktopTools
     {
         /// <summary>Types each character as a Unicode key-down/up pair.</summary>
-        private static object TypeText(IDictionary<string, object> args)
+        private object TypeText(IDictionary<string, object> args)
         {
             var text = Arguments.Text(args, "text", 20000);
             foreach (var character in text)
@@ -17,7 +17,7 @@ namespace WindowsToolService
         }
 
         /// <summary>Presses the given keys together, then releases them in reverse order.</summary>
-        private static object Press(IDictionary<string, object> args)
+        private object Press(IDictionary<string, object> args)
         {
             object raw;
             if (!args.TryGetValue("keys", out raw) || !(raw is IList))
@@ -85,7 +85,7 @@ namespace WindowsToolService
         };
 
         /// <summary>Extended-key flag for the navigation cluster and a few modifiers.</summary>
-        private static uint Extended(ushort key)
+        private uint Extended(ushort key)
         {
             return (key >= 33 && key <= 46) || key == 91 || key == 93 || key == 144 || key == 163 || key == 165 ? 1u : 0u;
         }

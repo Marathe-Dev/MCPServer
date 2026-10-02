@@ -15,7 +15,6 @@ namespace WindowsToolService
     {
         internal async Task<object> ExecuteAsync(IDictionary<string, object> args, CancellationToken cancellation)
         {
-            DesktopTools.RequireInteractiveDesktop();
             var command = Arguments.Text(args, "command", 8000);
             if (string.IsNullOrWhiteSpace(command) || command.IndexOfAny(new[] { '\0', '\r', '\n' }) >= 0)
                 throw new ArgumentException("command must be a non-empty single CMD command line; use & or && to compose commands.");

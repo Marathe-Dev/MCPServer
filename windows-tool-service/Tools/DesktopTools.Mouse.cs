@@ -8,7 +8,7 @@ namespace WindowsToolService
     internal sealed partial class DesktopTools
     {
         /// <summary>Moves the cursor, and optionally clicks, at a virtual-desktop pixel.</summary>
-        private static object Move(IDictionary<string, object> args, bool click)
+        private object Move(IDictionary<string, object> args, bool click)
         {
             var bounds = SystemInformation.VirtualScreen;
             var x = Arguments.Integer(args, "x", bounds.Left, bounds.Right - 1);
@@ -32,7 +32,7 @@ namespace WindowsToolService
         }
 
         /// <summary>Scrolls the wheel by whole notches (optionally after moving to a point).</summary>
-        private static object Scroll(IDictionary<string, object> args)
+        private object Scroll(IDictionary<string, object> args)
         {
             var bounds = SystemInformation.VirtualScreen;
             if (args.ContainsKey("x") && args.ContainsKey("y"))
@@ -54,7 +54,7 @@ namespace WindowsToolService
         }
 
         /// <summary>Holds a button at a start point, moves to an end point, and releases (a drag).</summary>
-        private static object Drag(IDictionary<string, object> args)
+        private object Drag(IDictionary<string, object> args)
         {
             var bounds = SystemInformation.VirtualScreen;
             var x = Arguments.Integer(args, "x", bounds.Left, bounds.Right - 1);

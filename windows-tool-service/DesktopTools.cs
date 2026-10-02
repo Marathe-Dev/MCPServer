@@ -87,7 +87,7 @@ namespace WindowsToolService
         }
 
         /// <summary>Throws if the session is locked or on a secure desktop.</summary>
-        internal static void RequireInteractiveDesktop()
+        internal void RequireInteractiveDesktop()
         {
             var desktop = OpenInputDesktop(0, false, 0x0100);
             if (desktop == IntPtr.Zero)
@@ -101,7 +101,7 @@ namespace WindowsToolService
         }
 
         /// <summary>Common success envelope shared by every desktop result.</summary>
-        private static Dictionary<string, object> Result()
+        private Dictionary<string, object> Result()
         {
             return new Dictionary<string, object>
             {
@@ -113,22 +113,22 @@ namespace WindowsToolService
 
         // ── SendInput plumbing ───────────────────────────────────────────────────────
 
-        private static Input KeyInput(ushort key, ushort scan, uint flags)
+        private Input KeyInput(ushort key, ushort scan, uint flags)
         {
             return new Input { Type = 1, Data = new InputUnion { Keyboard = new KeyboardInput { VirtualKey = key, Scan = scan, Flags = flags } } };
         }
 
-        private static Input MouseInput(uint flags)
+        private Input MouseInput(uint flags)
         {
             return MouseInput(flags, 0);
         }
 
-        private static Input MouseInput(uint flags, uint data)
+        private Input MouseInput(uint flags, uint data)
         {
             return new Input { Type = 0, Data = new InputUnion { Mouse = new MouseData { Flags = flags, MouseDataValue = data } } };
         }
 
-        private static void Send(Input[] inputs)
+        private void Send(Input[] inputs)
         {
             if (SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(Input))) != inputs.Length)
                 throw new InvalidOperationException("Windows rejected input. The target may be elevated or on a secure desktop.");

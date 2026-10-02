@@ -27,7 +27,7 @@ namespace WindowsToolService
             return result;
         }
 
-        private static Dictionary<string, object> FileEnvelope(string full, string name, int size)
+        private Dictionary<string, object> FileEnvelope(string full, string name, int size)
         {
             return new Dictionary<string, object>
             {
@@ -74,7 +74,7 @@ namespace WindowsToolService
         }
 
         /// <summary>Keeps the file name usable inside a storage object key.</summary>
-        private static string SafeName(string name)
+        private string SafeName(string name)
         {
             var chars = name.ToCharArray();
             for (var i = 0; i < chars.Length; i++)
@@ -83,7 +83,7 @@ namespace WindowsToolService
             return safe.Length == 0 ? "file" : safe;
         }
 
-        private static string ContentType(string name)
+        private string ContentType(string name)
         {
             var ext = Path.GetExtension(name).ToLowerInvariant();
             switch (ext)

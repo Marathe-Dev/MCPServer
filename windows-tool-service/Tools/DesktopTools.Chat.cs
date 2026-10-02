@@ -23,7 +23,7 @@ namespace WindowsToolService
         private const string RPC_INI_SEC_GEN = "General Settings";
         private const string RPC_MCP_CHAT_MESSAGE = "MCP_Chat_Message";
 
-        private static Process _chatProcess;
+        private Process _chatProcess;
 
         [StructLayout(LayoutKind.Sequential)]
         private struct COPYDATASTRUCT
@@ -36,7 +36,7 @@ namespace WindowsToolService
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, ref COPYDATASTRUCT lParam);
 
-        private static object SendChatMessage(IDictionary<string, object> args)
+        private object SendChatMessage(IDictionary<string, object> args)
         {
             var message = Arguments.Text(args, "message", 4000);
 
@@ -55,7 +55,7 @@ namespace WindowsToolService
         }
 
         /// <summary>Returns the cached window's handle, or Zero if the chat window needs (re)launching.</summary>
-        private static IntPtr ActiveChatWindowHandle()
+        private IntPtr ActiveChatWindowHandle()
         {
             if (_chatProcess == null) return IntPtr.Zero;
             try
@@ -66,7 +66,7 @@ namespace WindowsToolService
             catch (InvalidOperationException) { return IntPtr.Zero; } // process exited between calls
         }
 
-        private static void LaunchChatWindow(string message, string agentName)
+        private void LaunchChatWindow(string message, string agentName)
         {
             try
             {
@@ -87,7 +87,7 @@ namespace WindowsToolService
             }
         }
 
-        private static void SendCopyData(IntPtr hwnd, string message, string agentName)
+        private void SendCopyData(IntPtr hwnd, string message, string agentName)
         {
             var payload = agentName + "|" + message;
             var ptr = Marshal.StringToHGlobalUni(payload);
@@ -100,7 +100,7 @@ namespace WindowsToolService
         }
 
         // Base64Url (no '+','/','=') so the message/username survive the '&'/'='-delimited mcp_chat command line untouched.
-        private static string Base64UrlEncode(string value)
+        private string Base64UrlEncode(string value)
         {
             return Convert.ToBase64String(Encoding.UTF8.GetBytes(value)).Replace('+', '-').Replace('/', '_').TrimEnd('=');
         }

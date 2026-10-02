@@ -14,7 +14,7 @@ namespace WindowsToolService
         private const int DefaultDelaySeconds = 30;
 
         /// <summary>Schedules a restart (or cancels a pending one) via shutdown.exe and returns once it's scheduled — well before the reboot.</summary>
-        private static object Restart(IDictionary<string, object> args)
+        private object Restart(IDictionary<string, object> args)
         {
             var action = Arguments.Choice(args, "action", "restart", "restart", "cancel");
             int delaySeconds;

@@ -18,7 +18,7 @@ namespace WindowsToolService
     internal sealed partial class DesktopTools
     {
         /// <summary>Captures a target region and its metadata; encoded bytes come back via out params (no base64).</summary>
-        private static Dictionary<string, object> CaptureCore(IDictionary<string, object> args, out byte[] bytes, out string mimeType, out string format)
+        private Dictionary<string, object> CaptureCore(IDictionary<string, object> args, out byte[] bytes, out string mimeType, out string format)
         {
             var target = Arguments.Choice(args, "target", "primary", "primary", "virtual", "display", "window");
             Rectangle source;
@@ -126,7 +126,7 @@ namespace WindowsToolService
         }
 
         /// <summary>Draws the real system cursor onto the capture so the agent can confirm pointer position visually.</summary>
-        private static void DrawCursor(Graphics graphics, Rectangle source)
+        private void DrawCursor(Graphics graphics, Rectangle source)
         {
             CursorInfo info;
             info.Size = Marshal.SizeOf(typeof(CursorInfo));
@@ -139,7 +139,7 @@ namespace WindowsToolService
         }
 
         /// <summary>Metadata for every display so the agent can map screenshot pixels to input coordinates.</summary>
-        private static List<object> Displays()
+        private List<object> Displays()
         {
             var displays = new List<object>();
             var screens = Screen.AllScreens;
@@ -152,7 +152,7 @@ namespace WindowsToolService
         }
 
         /// <summary>Resolves a display capture rect from a stable displayId (DeviceName), falling back to displayIndex.</summary>
-        private static Rectangle ResolveDisplay(IDictionary<string, object> args)
+        private Rectangle ResolveDisplay(IDictionary<string, object> args)
         {
             var screens = Screen.AllScreens;
             if (args.ContainsKey("displayId"))
@@ -165,7 +165,7 @@ namespace WindowsToolService
         }
 
         /// <summary>Resolves a window capture rect from a stable windowId (HWND hex), falling back to a title substring.</summary>
-        private static Rectangle ResolveWindow(IDictionary<string, object> args)
+        private Rectangle ResolveWindow(IDictionary<string, object> args)
         {
             if (args.ContainsKey("windowId"))
             {
@@ -179,7 +179,7 @@ namespace WindowsToolService
         }
 
         /// <summary>Parses a "0x..." (or bare hex) window handle from get_window_list.</summary>
-        private static IntPtr ParseHandle(string id)
+        private IntPtr ParseHandle(string id)
         {
             var hex = id.StartsWith("0x") || id.StartsWith("0X") ? id.Substring(2) : id;
             long value;
@@ -189,14 +189,14 @@ namespace WindowsToolService
         }
 
         /// <summary>Friendly monitor/adapter name for a device, or the device name if unavailable.</summary>
-        private static string DisplayName(string deviceName)
+        private string DisplayName(string deviceName)
         {
             var info = new DisplayDevice { cb = Marshal.SizeOf(typeof(DisplayDevice)) };
             return EnumDisplayDevices(deviceName, 0, ref info, 0) && info.DeviceString.Length > 0 ? info.DeviceString : deviceName;
         }
 
         /// <summary>Effective DPI for the monitor covering this rect; diagnostic only now that PerMonitorV2 keeps coordinates consistent.</summary>
-        private static int MonitorDpi(Rectangle bounds)
+        private int MonitorDpi(Rectangle bounds)
         {
             var rect = new Rect { Left = bounds.Left, Top = bounds.Top, Right = bounds.Right, Bottom = bounds.Bottom };
             var monitor = MonitorFromRect(ref rect, MONITOR_DEFAULTTONEAREST);
@@ -205,7 +205,7 @@ namespace WindowsToolService
         }
 
         /// <summary>Encodes a bitmap as JPEG at the given quality using the built-in GDI+ encoder.</summary>
-        private static void SaveJpeg(Bitmap image, Stream stream, int quality)
+        private void SaveJpeg(Bitmap image, Stream stream, int quality)
         {
             var codec = ImageCodecInfo.GetImageEncoders().First(c => c.FormatID == ImageFormat.Jpeg.Guid);
             using (var parameters = new EncoderParameters(1))
@@ -216,7 +216,7 @@ namespace WindowsToolService
         }
 
         /// <summary>Finds the on-screen rectangle of the best-matching visible window by title (prefers focused).</summary>
-        private static Rectangle WindowRect(string title)
+        private Rectangle WindowRect(string title)
         {
             var match = IntPtr.Zero;
             var foreground = GetForegroundWindow();

@@ -14,7 +14,7 @@ namespace WindowsToolService
         private const int WindowListPageSize = 15;
 
         /// <summary>Lists visible, titled top-level windows with process, state and monitor info, 15 per page.</summary>
-        private static object Windows(IDictionary<string, object> args)
+        private object Windows(IDictionary<string, object> args)
         {
             var windows = new List<object>();
             var foreground = GetForegroundWindow();
@@ -75,7 +75,7 @@ namespace WindowsToolService
         }
 
         /// <summary>Process name for a pid, cached per enumeration; empty when access is denied.</summary>
-        private static string ProcessName(int pid, IDictionary<int, string> cache)
+        private string ProcessName(int pid, IDictionary<int, string> cache)
         {
             string name;
             if (cache.TryGetValue(pid, out name)) return name;
@@ -86,7 +86,7 @@ namespace WindowsToolService
         }
 
         /// <summary>Index of the monitor a window sits on, matching the screenshot displays[].</summary>
-        private static int DisplayIndex(Screen[] screens, IntPtr handle)
+        private int DisplayIndex(Screen[] screens, IntPtr handle)
         {
             var device = Screen.FromHandle(handle).DeviceName;
             for (var i = 0; i < screens.Length; i++)
@@ -95,13 +95,13 @@ namespace WindowsToolService
         }
 
         /// <summary>Extended window styles, using the pointer-size call that exists on both x86 and x64.</summary>
-        private static long ExStyle(IntPtr handle)
+        private long ExStyle(IntPtr handle)
         {
             return (IntPtr.Size == 8 ? GetWindowLongPtr64(handle, -20) : (IntPtr)GetWindowLong32(handle, -20)).ToInt64();
         }
 
         /// <summary>True when a window is DWM-cloaked (e.g. a virtual-desktop or suspended UWP window).</summary>
-        private static bool IsCloaked(IntPtr handle)
+        private bool IsCloaked(IntPtr handle)
         {
             int cloaked;
             return DwmGetWindowAttribute(handle, DWMWA_CLOAKED, out cloaked, sizeof(int)) == 0 && cloaked != 0;
