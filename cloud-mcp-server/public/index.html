@@ -79,17 +79,32 @@
   .hero .trust span{display:flex;align-items:center;gap:7px;}
   .dot{width:7px;height:7px;border-radius:50%;background:var(--blue);display:inline-block;}
 
-  .mock{
-    background:#0d1b2e;border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;
-    border:1px solid #14263d;
+  .flow-diagram{
+    background:#0d1b2e;border-radius:var(--radius);box-shadow:var(--shadow);
+    padding:36px 28px;display:flex;flex-direction:column;align-items:center;
   }
-  .mock .bar{display:flex;gap:6px;padding:12px 16px;background:#0a1626;}
-  .mock .bar i{width:10px;height:10px;border-radius:50%;background:#2b3b52;}
-  .mock pre{margin:0;padding:22px 22px 26px;color:#cfe3ff;font-size:.82rem;overflow-x:auto;}
-  .mock .tok{color:#7fd3a0;}
-  .mock .key{color:#8ab4ff;}
-  .mock .str{color:#f2c879;}
-  .mock .com{color:#6b7f98;}
+  .flow-node{
+    display:inline-flex;align-items:center;gap:10px;background:rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:10px 18px;
+    font-weight:700;font-size:.9rem;color:#eaf5fc;white-space:nowrap;
+  }
+  .flow-node .flow-icon{
+    width:26px;height:26px;border-radius:7px;background:rgba(255,255,255,.12);
+    display:flex;align-items:center;justify-content:center;flex:0 0 auto;
+  }
+  .flow-node .flow-icon svg{width:15px;height:15px;}
+  .flow-node.server{
+    background:linear-gradient(135deg,var(--blue),var(--accent));border-color:transparent;
+    box-shadow:0 10px 24px rgba(13,114,185,.4);font-size:.95rem;
+  }
+  .flow-node.server .flow-icon{background:rgba(255,255,255,.25);}
+  .flow-node.target{font-size:.8rem;padding:8px 14px;}
+  .flow-link{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;}
+  .flow-link .bar{width:2px;height:14px;background:#2b3b52;}
+  .flow-link .bar.tall{height:26px;}
+  .flow-link .label{color:#8ab4ff;font-size:.68rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;}
+  .flow-link::after{content:"";width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid #2b3b52;margin-top:-1px;}
+  .flow-more{margin-top:16px;font-size:.78rem;color:#cfe3ff;font-weight:600;text-align:center;max-width:220px;}
 
   /* ---- Section shell ---- */
   section{padding:64px 0;}
@@ -199,12 +214,20 @@
   .persona h4{margin:0 0 8px;color:var(--navy);font-size:.98rem;}
   .persona p{margin:0;color:var(--muted);font-size:.86rem;}
 
-  /* ---- Client chips ---- */
-  .chip-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px;}
-  .chip{
-    background:#fff;border:1px solid var(--line);color:var(--navy);font-weight:700;font-size:.82rem;
-    padding:8px 16px;border-radius:999px;box-shadow:var(--shadow);
+  /* ---- Client logos ---- */
+  .client-heading{margin:28px 0 14px;font-size:1rem;color:var(--navy);font-weight:700;}
+  .client-grid{display:flex;flex-wrap:wrap;gap:12px;}
+  .client-card{
+    display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);
+    border-radius:12px;padding:10px 16px;box-shadow:var(--shadow);font-weight:700;color:var(--navy);font-size:.88rem;
   }
+  .client-icon{
+    width:30px;height:30px;border-radius:8px;background:var(--sky);color:var(--blue);
+    display:flex;align-items:center;justify-content:center;flex:0 0 auto;
+  }
+  .client-icon svg{width:17px;height:17px;}
+  .client-icon.logo{background:#fff;border:1px solid var(--line);padding:4px;}
+  .client-icon.logo img{width:100%;height:100%;object-fit:contain;}
 
   /* ---- Use-case feature cards ---- */
   .case-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:28px;}
@@ -245,8 +268,8 @@
 
 <div class="topbar">
   <div class="wrap">
-    <a href="#connect">Support</a>
-    <a href="#connect">Sign in to RemotePC</a>
+    <a href="https://www.remotepc.com/support" target="_blank" rel="noopener">Support</a>
+    <a href="https://app.remotepc.com/rpcnew/login" target="_blank" rel="noopener">Sign in to RemotePC</a>
   </div>
 </div>
 
@@ -256,11 +279,11 @@
       <img src="assets/remotepc-logo.svg" alt="RemotePC">
     </div>
     <div class="links">
+      <a href="#who">Who it's for</a>
       <a href="#tools">Tools</a>
       <a href="#connect">How it works</a>
-      <a href="#security">Security</a>
-      <a href="#who">Who it's for</a>
       <a href="#workflows">Use cases</a>
+      <a href="#security">Security</a>
       <a href="#faq">FAQ</a>
     </div>
     <a href="#connect" class="btn sm">Get your MCP endpoint</a>
@@ -273,7 +296,7 @@
     <div class="wrap grid">
       <div>
         <span class="eyebrow">New · MCP for RemotePC</span>
-        <h1>Let your AI agent drive any computer on your RemotePC account</h1>
+        <h1>Give your AI agent real control of your computers</h1>
         <p class="lead">
           RemotePC now exposes an MCP endpoint. Add it to any MCP-compatible agent,
           sign in to your RemotePC account when prompted, and grant the session a
@@ -286,28 +309,30 @@
           <a href="#connect" class="btn">Get your MCP endpoint</a>
           <a href="#tools" class="btn ghost">See the tools</a>
         </div>
-        <div class="trust">
-          <span><i class="dot"></i>Sign in with your RemotePC account — no API tokens</span>
-          <span><i class="dot"></i>No bytes over chat — only signed URLs</span>
-          <span><i class="dot"></i>You choose read-only or read-write, and for how long</span>
-        </div>
       </div>
 
-      <div class="mock">
-        <div class="bar"><i></i><i></i><i></i></div>
-        <pre><span class="com">// your MCP client config — just the endpoint, no token</span>
-{
-  <span class="key">"mcpServers"</span>: {
-    <span class="key">"remotepc"</span>: {
-      <span class="key">"url"</span>: <span class="str">"https://mcp.remotepc.com/mcp"</span>
-    }
-  }
-}
-
-<span class="com">// first use opens a browser to sign in and grant access</span>
-<span class="com">// then ask your agent</span>
-<span class="tok">"Take a screenshot of 'Design-PC', open the</span>
-<span class="tok"> report in Explorer, and tell me what changed."</span></pre>
+      <div class="flow-diagram">
+        <div class="flow-node">
+          <span class="flow-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="7" width="10" height="10" rx="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg></span>
+          AI Agent
+        </div>
+        <div class="flow-link">
+          <span class="bar"></span>
+          <span class="label">MCP</span>
+          <span class="bar"></span>
+        </div>
+        <div class="flow-node server">
+          <span class="flow-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="6" rx="1"/><rect x="3" y="14" width="18" height="6" rx="1"/><path d="M7 7h.01M7 17h.01"/></svg></span>
+          RemotePC MCP Server
+        </div>
+        <div class="flow-link">
+          <span class="bar tall"></span>
+        </div>
+        <div class="flow-node target">
+          <span class="flow-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="12" rx="1"/><path d="M8 20h8M12 16v4"/></svg></span>
+          Remote Computer
+        </div>
+        <div class="flow-more">Already configured on your account</div>
       </div>
     </div>
   </section>
@@ -482,12 +507,28 @@
         <span class="eyebrow">Setup</span>
         <h2>Four steps, no separate app to install</h2>
         <p>Unlike remote-desktop tools that need a local MCP bridge running next to the app, RemotePC's MCP server is hosted — your agent connects straight to it over HTTPS, and every permission is granted through your RemotePC account, not a copy-pasted token.</p>
-        <div class="chip-row">
-          <span class="chip">Claude Desktop</span>
-          <span class="chip">Cursor</span>
-          <span class="chip">ChatGPT</span>
-          <span class="chip">Windsurf</span>
-          <span class="chip">Any Streamable HTTP MCP client</span>
+        <h3 class="client-heading">Works with your favorite AI agent</h3>
+        <div class="client-grid">
+          <div class="client-card">
+            <span class="client-icon logo"><img src="assets/clients/claude.png" alt=""></span>
+            Claude
+          </div>
+          <div class="client-card">
+            <span class="client-icon logo"><img src="assets/clients/cursor.png" alt=""></span>
+            Cursor
+          </div>
+          <div class="client-card">
+            <span class="client-icon logo"><img src="assets/clients/chatgpt.png" alt=""></span>
+            ChatGPT
+          </div>
+          <div class="client-card">
+            <span class="client-icon logo"><img src="assets/clients/windsurf.png" alt=""></span>
+            Windsurf
+          </div>
+          <div class="client-card">
+            <span class="client-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2v4M15 2v4M7 6h10v4a5 5 0 0 1-5 5 5 5 0 0 1-5-5V6z"/><path d="M12 15v4M9 19h6"/></svg></span>
+            Custom MCP clients
+          </div>
         </div>
       </div>
       <div class="steps">
@@ -539,43 +580,6 @@
     </div>
   </section>
 
-  <!-- Security -->
-  <section id="security">
-    <div class="wrap">
-      <div class="section-head">
-        <span class="eyebrow">Security by design</span>
-        <h2>The agent only gets what the host already allows</h2>
-        <p>MCP access rides on the same trust model RemotePC already enforces locally — nothing new to configure, nothing silently unlocked.</p>
-      </div>
-      <div class="sec-grid">
-        <div class="sec-item">
-          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
-          <div><h4>Locked-desktop protection</h4><p>Screen capture, mouse, keyboard, and window listing all refuse to run on a locked, screen-saver, or secure desktop.</p></div>
-        </div>
-        <div class="sec-item">
-          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/></svg></div>
-          <div><h4>Opt-in for the risky ones</h4><p>Command execution, restart, and software update are off until the person at that computer turns them on locally — no remote override.</p></div>
-        </div>
-        <div class="sec-item">
-          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3v5h5M6 3h8l5 5v13H6z"/></svg></div>
-          <div><h4>No file or image bytes in chat</h4><p>Screenshots and file reads always return a short-lived signed URL — never inline base64 — so large payloads never sit in agent context or logs.</p></div>
-        </div>
-        <div class="sec-item">
-          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
-          <div><h4>One action at a time</h4><p>Each host runs a single tool call at a time; an overlapping call gets a clear "busy, retry" response instead of racing input.</p></div>
-        </div>
-        <div class="sec-item">
-          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg></div>
-          <div><h4>Read-only or read-write, your choice</h4><p>Grant observation-only access for monitoring, or full control when the agent needs to act — chosen per session, not a fixed, all-or-nothing scope.</p></div>
-        </div>
-        <div class="sec-item">
-          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg></div>
-          <div><h4>Access expires on its own</h4><p>Every grant has a time limit you set up front — from 12 hours to 30 days. No lingering access to clean up later.</p></div>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- Workflows -->
   <section class="alt" id="workflows">
     <div class="wrap">
@@ -611,6 +615,43 @@
         <div class="ask"><b>Heads-up before maintenance.</b>&nbsp;The agent messages the user on-screen, then schedules a restart with a grace period.</div>
         <div class="ask"><b>Read-only morning check-in.</b>&nbsp;With a read-only grant, the agent can look but the session can't click, type, or change anything even if asked.</div>
         <div class="ask"><b>Short-lived access for one task.</b>&nbsp;Grant read-write for two hours while pairing on a bug, then let it expire — nothing to remember to revoke.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Security -->
+  <section id="security">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Security by design</span>
+        <h2>The agent only gets what the host already allows</h2>
+        <p>MCP access rides on the same trust model RemotePC already enforces locally — nothing new to configure, nothing silently unlocked.</p>
+      </div>
+      <div class="sec-grid">
+        <div class="sec-item">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
+          <div><h4>Locked-desktop protection</h4><p>Screen capture, mouse, keyboard, and window listing all refuse to run on a locked, screen-saver, or secure desktop.</p></div>
+        </div>
+        <div class="sec-item">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/></svg></div>
+          <div><h4>Opt-in for the risky ones</h4><p>Command execution, restart, and software update are off until the person at that computer turns them on locally — no remote override.</p></div>
+        </div>
+        <div class="sec-item">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3v5h5M6 3h8l5 5v13H6z"/></svg></div>
+          <div><h4>No file or image bytes in chat</h4><p>Screenshots and file reads always return a short-lived signed URL — never inline base64 — so large payloads never sit in agent context or logs.</p></div>
+        </div>
+        <div class="sec-item">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
+          <div><h4>One action at a time</h4><p>Each host runs a single tool call at a time; an overlapping call gets a clear "busy, retry" response instead of racing input.</p></div>
+        </div>
+        <div class="sec-item">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg></div>
+          <div><h4>Read-only or read-write, your choice</h4><p>Grant observation-only access for monitoring, or full control when the agent needs to act — chosen per session, not a fixed, all-or-nothing scope.</p></div>
+        </div>
+        <div class="sec-item">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg></div>
+          <div><h4>Access expires on its own</h4><p>Every grant has a time limit you set up front — from 12 hours to 30 days. No lingering access to clean up later.</p></div>
+        </div>
       </div>
     </div>
   </section>
