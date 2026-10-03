@@ -206,7 +206,7 @@
   .client-icon.logo img{width:100%;height:100%;object-fit:contain;}
 
   /* ---- Use-case feature cards ---- */
-  .case-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:28px;}
+  .case-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;margin-bottom:28px;}
   .case-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px;}
   .case-card .tag{display:inline-block;font-size:.72rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--blue);margin-bottom:10px;}
   .case-card h4{margin:0 0 8px;color:var(--navy);font-size:1rem;}
@@ -217,10 +217,10 @@
   }
   .more-asks{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
   .ask{
-    display:flex;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:10px;
-    padding:12px 14px;font-size:.86rem;color:var(--muted);align-items:flex-start;
+    background:var(--card);border:1px solid var(--line);border-radius:10px;
+    padding:14px 16px;font-size:.86rem;color:var(--muted);line-height:1.55;
   }
-  .ask b{color:var(--navy);}
+  .ask b{color:var(--navy);display:block;margin-bottom:4px;}
 
   /* ---- Footer ---- */
   footer{padding:36px 0 50px;color:var(--muted);font-size:.85rem;}
@@ -377,7 +377,7 @@
             <span class="icon" style="margin-bottom:0;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>
             Screen capture
           </h3>
-          <p>Captures the primary display, a specific monitor, a window, or the full virtual desktop — scaled and encoded automatically, with a coordinate map so the agent's clicks land exactly where the pixels are.</p>
+          <p>Sees exactly what's on screen — the full desktop, a single monitor, or just one window — so the agent knows what it's looking at before it does anything.</p>
           <div class="badges"><span class="badge">Screenshot</span></div>
         </div>
 
@@ -386,7 +386,7 @@
             <span class="icon" style="margin-bottom:0;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 8h.01M12 8h.01M16 8h.01M8 12h.01M12 12h.01M16 12h.01"/></svg></span>
             Window list
           </h3>
-          <p>Lists visible top-level windows — title, position, size, process, and which monitor each sits on — so the agent can find or target a specific window before capturing or acting on it.</p>
+          <p>Gets a simple list of what's open on the computer, so the agent can find the right window before it clicks or types anything.</p>
           <div class="badges"><span class="badge">Get window list</span></div>
         </div>
 
@@ -395,7 +395,7 @@
             <span class="icon" style="margin-bottom:0;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12l5 5M4 12l5-5M20 7v10"/></svg></span>
             Mouse control
           </h3>
-          <p>Move, click (left/right, single/double), scroll, and drag at exact virtual-desktop coordinates — the same coordinates returned by a screenshot, so "click the button at (x, y)" just works.</p>
+          <p>Moves the cursor, clicks, scrolls, or drags — just like using a mouse yourself, but from anywhere.</p>
           <div class="badges"><span class="badge">Mouse</span></div>
         </div>
 
@@ -404,7 +404,7 @@
             <span class="icon" style="margin-bottom:0;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"/></svg></span>
             Keyboard control
           </h3>
-          <p>Types literal Unicode text, or presses a key combination (ctrl+s, alt+F4, and the rest) held together and released in order — the same two actions a person would use.</p>
+          <p>Types out text or presses a shortcut like Ctrl+S or Alt+F4 — the agent types just like a person sitting at the keyboard would.</p>
           <div class="badges"><span class="badge">Keyboard</span></div>
         </div>
 
@@ -413,7 +413,7 @@
             <span class="icon" style="margin-bottom:0;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5l6 6-6 6M12 17h8"/></svg></span>
             Command execution
           </h3>
-          <p>Runs one CMD command line through a real console and returns combined output, exit code, and whether it timed out — for diagnostics, scripts, or quick fixes.</p>
+          <p>Runs a quick command and reports back what happened — handy for checking what's using up space or fixing something small, without opening a terminal yourself.</p>
           <div class="badges"><span class="badge">Cmd</span><span class="badge gate">opt-in</span></div>
         </div>
 
@@ -422,7 +422,7 @@
             <span class="icon" style="margin-bottom:0;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3v5h5M6 3h8l5 5v13H6z"/></svg></span>
             File retrieval
           </h3>
-          <p>Reads a file from the host's disk (up to 10 MB) and hands the agent a short-lived, presigned download link — the bytes never pass through chat history.</p>
+          <p>Pulls a file off the computer and hands back a safe, temporary link to download it — no digging through folders yourself.</p>
           <div class="badges"><span class="badge">Get file</span></div>
         </div>
 
@@ -431,7 +431,7 @@
             <span class="icon" style="margin-bottom:0;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
             Chat notification
           </h3>
-          <p>Posts a view-only message to the person sitting at the host, in a small on-screen window, so they know what the agent is doing or just did — no reply channel back to the agent.</p>
+          <p>Pops up a quick on-screen message for whoever's at the computer, so they know what the agent is doing.</p>
           <div class="badges"><span class="badge">Send chat message</span></div>
         </div>
 
@@ -440,7 +440,7 @@
             <span class="icon" style="margin-bottom:0;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v8M18.4 6.6a9 9 0 1 1-12.8 0"/></svg></span>
             Restart management
           </h3>
-          <p>Schedules or cancels a restart, with a grace period and an optional on-screen message — the agent gets its acknowledgement well before the machine actually reboots.</p>
+          <p>Schedules a restart (or cancels one already set), with a short warning message if you want — so nothing restarts without notice.</p>
           <div class="badges"><span class="badge">Device restart</span><span class="badge gate">opt-in</span></div>
         </div>
 
@@ -449,7 +449,7 @@
             <span class="icon" style="margin-bottom:0;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg></span>
             Software update
           </h3>
-          <p>Checks for the latest RemotePC host version, downloads and installs it, and confirms the new version afterward — keeping the agent current without anyone at the keyboard.</p>
+          <p>Keeps RemotePC itself up to date automatically — no one needs to click "update" by hand.</p>
           <div class="badges"><span class="badge">Update remotepc app</span><span class="badge gate">opt-in</span></div>
         </div>
       </div>
@@ -461,8 +461,8 @@
     <div class="wrap">
       <div class="section-head">
         <span class="eyebrow">Setup</span>
-        <h2>Four steps, no separate app to install</h2>
-        <p>Unlike remote-desktop tools that need a local MCP bridge running next to the app, RemotePC's MCP server is hosted — your agent connects straight to it over HTTPS, and every permission is granted through your RemotePC account, not a copy-pasted token.</p>
+        <h2>Get connected in four simple steps</h2>
+        <p>Add RemotePC to your AI agent once, sign in, and choose how much access to give it. From then on, every computer already set up with RemotePC is ready for your agent to use.</p>
         <h3 class="client-heading">Works with your favorite AI agent</h3>
         <div class="client-grid">
           <div class="client-card">
@@ -548,29 +548,37 @@
       <div class="case-grid">
         <div class="case-card">
           <span class="tag">Problem → Solution</span>
-          <h4>An error dialog is blocking work and no one's at the desk</h4>
-          <p>The agent takes a screenshot, finds the dialog in the window list, dismisses it, and lets the user know what happened — no one has to remote in just to click "OK."</p>
-          <div class="prompt">"Take a screenshot of 'Reception-PC', find the error dialog, close it, and tell the user what you did."</div>
+          <h4>A pop-up is stuck on screen and no one's there to close it</h4>
+          <p>The agent looks at the screen, spots the dialog, and closes it — then lets the person know what happened and why.</p>
+          <div class="prompt">"Take a screenshot of 'Reception-PC'. If there's an error on screen, close it and tell me what it said."</div>
         </div>
         <div class="case-card">
           <span class="tag">Problem → Solution</span>
-          <h4>Something feels slow and no one can tell why</h4>
-          <p>The agent runs a command to pull disk space, memory, and running processes, then summarizes what looks unusual in plain language — no manual console session required.</p>
-          <div class="prompt">"Check disk space and running processes on 'Warehouse-Server' and flag anything unusual."</div>
+          <h4>A computer feels slow and nobody can say why</h4>
+          <p>The agent checks what's running and how much space is free, then explains what looks off in plain language — no terminal required.</p>
+          <div class="prompt">"Check what's slowing down 'Warehouse-Server' and tell me in plain English."</div>
         </div>
         <div class="case-card">
           <span class="tag">Problem → Solution</span>
-          <h4>A fleet of machines keeps falling behind on updates</h4>
-          <p>Granted a time-limited session per machine, the agent checks for a pending RemotePC update, installs it, and confirms the new version — no site visit needed.</p>
-          <div class="prompt">"Check 'Lobby-Kiosk' for a pending RemotePC update, install it, and confirm the new version."</div>
+          <h4>A few computers keep falling behind on updates</h4>
+          <p>One by one, the agent checks a machine, installs anything pending, and confirms it's current — no site visit needed.</p>
+          <div class="prompt">"Check 'Lobby-Kiosk' for a pending RemotePC update, install it, and confirm it worked."</div>
+        </div>
+        <div class="case-card">
+          <span class="tag">Problem → Solution</span>
+          <h4>A family member is stuck and can't explain what's wrong</h4>
+          <p>The agent looks at their screen, reads out whatever's on it in plain terms, and fixes it directly if it's simple — no drive over to help.</p>
+          <div class="prompt">"Take a screenshot of Mom's computer and tell me what that pop-up says."</div>
         </div>
       </div>
 
       <div class="more-asks">
-        <div class="ask"><b>Grab a file, hands-off.</b>&nbsp;"Pull today's export CSV from the Downloads folder on 'Finance-Laptop'" returns a link — no one remotes in manually.</div>
-        <div class="ask"><b>Heads-up before maintenance.</b>&nbsp;The agent messages the user on-screen, then schedules a restart with a grace period.</div>
-        <div class="ask"><b>Read-only morning check-in.</b>&nbsp;With a read-only grant, the agent can look but the session can't click, type, or change anything even if asked.</div>
-        <div class="ask"><b>Short-lived access for one task.</b>&nbsp;Grant read-write for two hours while pairing on a bug, then let it expire — nothing to remember to revoke.</div>
+        <div class="ask"><b>Grab a file without digging through folders.</b>"Pull today's export from the Downloads folder on 'Finance-Laptop'" hands back a link in seconds.</div>
+        <div class="ask"><b>Give people a heads-up before anything changes.</b>The agent can post an on-screen message before it restarts a machine or makes a change.</div>
+        <div class="ask"><b>Just look, don't touch.</b>With read-only access, the agent can check in on a computer without being able to click, type, or change anything.</div>
+        <div class="ask"><b>Lend access for a single task.</b>Grant access for an hour while you pair on something, and it quietly expires when you're done.</div>
+        <div class="ask"><b>Open the right app before you sit down.</b>"Open the invoicing software on 'Office-PC' so it's ready when I get there."</div>
+        <div class="ask"><b>Clear a stuck print queue.</b>"The printer on 'Front-Desk-PC' seems stuck — clear the queue and send a test page."</div>
       </div>
     </div>
   </section>
