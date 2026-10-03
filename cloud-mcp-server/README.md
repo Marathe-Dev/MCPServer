@@ -26,9 +26,15 @@ npm start
 ```
 
 This exposes:
+- `http://<host>:<port>/` — the marketing/landing page (`public/index.html`) describing the
+   MCP feature for end users; served as static HTML, no build step required.
+- `http://<host>:<port>/health` — plain JSON liveness check (`{"status":"ok", ...}`).
 - `http://<host>:<port>/mcp` — one universal MCP endpoint; every tool call names its
    target device via a `deviceId` argument (see `list_devices` to discover connected ones).
 - `ws://<host>:<port>/device-link` — WebSocket endpoint a local-tool-service connects to.
+
+Static assets for the landing page live in `public/` (served as-is, outside the TypeScript
+build) — edit `public/index.html` directly; it's a copy of `../website/remotepc-mcp.html`.
 
 ## Test
 

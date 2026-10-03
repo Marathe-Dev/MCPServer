@@ -4,6 +4,9 @@ import {
   type ServerResponse,
   type Server,
 } from "node:http";
+import { readFileSync } from "node:fs";
+import { dirname, extname, join, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   createMcpHandler,
   type McpHttpHandler,
@@ -14,6 +17,32 @@ import { DeviceRegistry } from "./relay/device-registry.js";
 import { createDeviceLinkServer } from "./relay/device-link-server.js";
 
 export const MCP_PATH = /^\/mcp\/?$/;
+
+// public/ sits next to src/ and build/, so this resolves the same way whether run via ts-node or from build/app.js.
+const PUBLIC_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "public");
+
+const STATIC_CONTENT_TYPES: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".css": "text/css; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".png": "image/png",
+  ".ico": "image/x-icon",
+};
+
+/** Reads a file under public/, rejecting any path that escapes it; undefined if missing. */
+function readPublicFile(relativePath: string): { body: Buffer; contentType: string } | undefined {
+  const fullPath = resolve(PUBLIC_DIR, "." + relativePath);
+  if (fullPath !== PUBLIC_DIR && !fullPath.startsWith(PUBLIC_DIR + sep)) return undefined;
+  try {
+    const contentType = STATIC_CONTENT_TYPES[extname(fullPath)] ?? "application/octet-stream";
+    return { body: readFileSync(fullPath), contentType };
+  } catch {
+    return undefined;
+  }
+}
+
+const landingPage = readPublicFile("/index.html");
 
 export interface CloudApp {
   httpServer: Server;
@@ -41,6 +70,17 @@ export function createApp(): CloudApp {
     console.error(`[cloud-mcp-server] http ${req.method} ${pathname}`);
 
     if (pathname === "/") {
+      if (landingPage) {
+        res.writeHead(200, { "content-type": landingPage.contentType });
+        res.end(landingPage.body);
+      } else {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ status: "ok", service: "cloud-mcp-server" }));
+      }
+      return;
+    }
+
+    if (pathname === "/health") {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({ status: "ok", service: "cloud-mcp-server" }));
       return;
@@ -54,6 +94,13 @@ export function createApp(): CloudApp {
           res.end("Internal server error");
         }
       });
+      return;
+    }
+
+    const staticFile = readPublicFile(pathname);
+    if (staticFile) {
+      res.writeHead(200, { "content-type": staticFile.contentType });
+      res.end(staticFile.body);
       return;
     }
 
