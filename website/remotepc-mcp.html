@@ -79,32 +79,8 @@
   .hero .trust span{display:flex;align-items:center;gap:7px;}
   .dot{width:7px;height:7px;border-radius:50%;background:var(--blue);display:inline-block;}
 
-  .flow-diagram{
-    background:#0d1b2e;border-radius:var(--radius);box-shadow:var(--shadow);
-    padding:36px 28px;display:flex;flex-direction:column;align-items:center;
-  }
-  .flow-node{
-    display:inline-flex;align-items:center;gap:10px;background:rgba(255,255,255,.06);
-    border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:10px 18px;
-    font-weight:700;font-size:.9rem;color:#eaf5fc;white-space:nowrap;
-  }
-  .flow-node .flow-icon{
-    width:26px;height:26px;border-radius:7px;background:rgba(255,255,255,.12);
-    display:flex;align-items:center;justify-content:center;flex:0 0 auto;
-  }
-  .flow-node .flow-icon svg{width:15px;height:15px;}
-  .flow-node.server{
-    background:linear-gradient(135deg,var(--blue),var(--accent));border-color:transparent;
-    box-shadow:0 10px 24px rgba(13,114,185,.4);font-size:.95rem;
-  }
-  .flow-node.server .flow-icon{background:rgba(255,255,255,.25);}
-  .flow-node.target{font-size:.8rem;padding:8px 14px;}
-  .flow-link{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;}
-  .flow-link .bar{width:2px;height:14px;background:#2b3b52;}
-  .flow-link .bar.tall{height:26px;}
-  .flow-link .label{color:#8ab4ff;font-size:.68rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;}
-  .flow-link::after{content:"";width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid #2b3b52;margin-top:-1px;}
-  .flow-more{margin-top:16px;font-size:.78rem;color:#cfe3ff;font-weight:600;text-align:center;max-width:220px;}
+  .hero-diagram{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;}
+  .hero-diagram img{width:100%;height:auto;display:block;border-radius:10px;}
 
   /* ---- Section shell ---- */
   section{padding:64px 0;}
@@ -311,28 +287,8 @@
         </div>
       </div>
 
-      <div class="flow-diagram">
-        <div class="flow-node">
-          <span class="flow-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="7" width="10" height="10" rx="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg></span>
-          AI Agent
-        </div>
-        <div class="flow-link">
-          <span class="bar"></span>
-          <span class="label">MCP</span>
-          <span class="bar"></span>
-        </div>
-        <div class="flow-node server">
-          <span class="flow-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="6" rx="1"/><rect x="3" y="14" width="18" height="6" rx="1"/><path d="M7 7h.01M7 17h.01"/></svg></span>
-          RemotePC MCP Server
-        </div>
-        <div class="flow-link">
-          <span class="bar tall"></span>
-        </div>
-        <div class="flow-node target">
-          <span class="flow-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="12" rx="1"/><path d="M8 20h8M12 16v4"/></svg></span>
-          Remote Computer
-        </div>
-        <div class="flow-more">Already configured on your account</div>
+      <div class="hero-diagram">
+        <img src="assets/hero-diagram.png" alt="AI agents connect through RemotePC MCP to a RemotePC host already configured on your account">
       </div>
     </div>
   </section>
