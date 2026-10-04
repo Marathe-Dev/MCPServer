@@ -83,7 +83,9 @@ namespace WindowsToolService
             }
             catch (Exception ex)
             {
-                Log.Write($"DesktopTools.Chats - LaunchChatWindow : {ex}");
+                // Was previously swallowed here, so SendChatMessage returned "success" even though no window opened - rethrow so the caller/relay reports the real failure.
+                Log.Write("DesktopTools.Chat - LaunchChatWindow failed", ex);
+                throw new InvalidOperationException("Could not open the chat window: " + ex.Message, ex);
             }
         }
 

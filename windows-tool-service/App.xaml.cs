@@ -96,7 +96,7 @@ namespace WindowsToolService
                     }
                     catch (Exception ex)
                     {
-                        Log.Write("App : @E Exception : " + ex.Message);
+                        Log.Write("App : @E Exception", ex);
                         Shutdown(1);
                     }
                 }
