@@ -93,12 +93,13 @@ namespace WindowsToolService
 
         private async Task HandleAsync(IRelayChannel channel, IDictionary<string, object> message, string requestId, CancellationToken cancellation)
         {
+            var tool = "unknown"; // hoisted so the catch below still has a tool name even if parsing "tool" itself fails
             try
             {
                 object response;
                 try
                 {
-                    var tool = Arguments.Text(message, "tool", 100);
+                    tool = Arguments.Text(message, "tool", 100);
                     object rawArgs;
                     message.TryGetValue("args", out rawArgs);
                     var args = rawArgs == null ? new Dictionary<string, object>() : rawArgs as IDictionary<string, object>;
@@ -113,12 +114,13 @@ namespace WindowsToolService
                 }
                 catch (Exception error)
                 {
-                    response = new { type = "tool_result", requestId = requestId, ok = false, error = error.Message };
+                    // Single relay boundary for every tool: logs full detail and translates to a safe, user-friendly message.
+                    response = new { type = "tool_result", requestId = requestId, ok = false, error = ErrorMessages.Resolve(tool, error) };
                 }
                 await SendAsync(channel, response, cancellation).ConfigureAwait(false);
                 status("Connected");
             }
-            catch (Exception error) { status("Result delivery failed: " + error.Message); }
+            catch (Exception error) { Log.Write("Result delivery failed for tool \"" + tool + "\"", error); status("Result delivery failed: " + error.Message); }
             finally { actionGate.Release(); }
         }
 

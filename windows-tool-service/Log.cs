@@ -40,10 +40,10 @@ namespace WindowsToolService
             }
         }
 
-        /// <summary>Appends a message together with the exception type and text.</summary>
+        /// <summary>Appends a message, the exception type/text, and its stack trace (for diagnosing bugs after the fact).</summary>
         internal static void Write(string message, Exception error)
         {
-            Write(message + " | " + error.GetType().Name + ": " + error.Message);
+            Write(message + " | " + error.GetType().Name + ": " + error.Message + Environment.NewLine + error.StackTrace);
         }
 
         /// <summary>Keeps only the most recent <see cref="KeepBytes"/> once the log passes <see cref="MaxBytes"/>.</summary>

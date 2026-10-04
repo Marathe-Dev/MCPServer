@@ -17,6 +17,9 @@ else {
 if ($LASTEXITCODE -ne 0) { throw 'Test build failed.' }
 $output = if ($Platform -eq 'AnyCPU') { "bin\Tests\AnyCPU\$Configuration" } else { "bin\Tests\$Configuration" }
 $testExe = Join-Path $PSScriptRoot "$output\WindowsToolService.Tests.exe"
-& $testExe @(if ($NativeTest) { '--native' })
+# Run from the exe's own folder: the logger (AppDataFolderPath isn't set outside real WPF startup) falls back to a
+# cwd-relative path, and the smoke test asserts the log lands next to the exe, not next to this script.
+Push-Location (Split-Path $testExe)
+try { & $testExe @(if ($NativeTest) { '--native' }) } finally { Pop-Location }
 if ($LASTEXITCODE -ne 0) { throw 'Smoke tests failed.' }
 Write-Host "Tested: $testExe"

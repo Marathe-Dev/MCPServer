@@ -41,6 +41,7 @@
     <Compile Include="Tools\DesktopTools.GetFile.cs" />
     <Compile Include="Tools\DesktopTools.Restart.cs" />
     <Compile Include="Tools\DesktopTools.Chat.cs" />
+    <Compile Include="Common\ErrorMessages.cs" />
     <Compile Include="Common\S3Presigner.cs" />
     <Compile Include="Log.cs" />
     <Compile Include="RelayChannel\RelayChannel.cs" />
