@@ -1,5 +1,5 @@
+using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Windows.Forms;
 
 namespace WindowsToolService
@@ -16,7 +16,7 @@ namespace WindowsToolService
             var button = Arguments.Choice(args, "button", "left", "left", "right");
             var clickType = Arguments.Choice(args, "clickType", "single", "single", "double");
 
-            if (!SetCursorPos(x, y)) throw new Win32Exception();
+            MoveCursor(x, y);
 
             if (click)
             {
@@ -39,7 +39,7 @@ namespace WindowsToolService
             {
                 var px = Arguments.Integer(args, "x", bounds.Left, bounds.Right - 1);
                 var py = Arguments.Integer(args, "y", bounds.Top, bounds.Bottom - 1);
-                if (!SetCursorPos(px, py)) throw new Win32Exception();
+                MoveCursor(px, py);
             }
 
             var amount = Arguments.Integer(args, "amount", -100, 100);
@@ -64,9 +64,9 @@ namespace WindowsToolService
             var button = Arguments.Choice(args, "button", "left", "left", "right");
             var down = button == "right" ? 0x0008u : 0x0002u;
 
-            if (!SetCursorPos(x, y)) throw new Win32Exception();
+            MoveCursor(x, y);
             Send(new[] { MouseInput(down) });
-            if (!SetCursorPos(toX, toY)) throw new Win32Exception();
+            MoveCursor(toX, toY);
             Send(new[] { MouseInput(0x0001) }); // MOUSEEVENTF_MOVE so the target registers the drag
             Send(new[] { MouseInput(down * 2) });
 
@@ -76,6 +76,13 @@ namespace WindowsToolService
             result["toX"] = toX;
             result["toY"] = toY;
             return result;
+        }
+
+        /// <summary>SetCursorPos can return false without setting a fresh/meaningful last-error (e.g. blocked by UIPI when the foreground window runs elevated), so GetLastError there is unreliable - give an actionable message instead of a misleading Win32Exception.</summary>
+        private void MoveCursor(int x, int y)
+        {
+            if (!SetCursorPos(x, y))
+                throw new InvalidOperationException("Could not move the cursor. The foreground app may be running elevated (Windows blocks input from a non-elevated process), or the desktop changed mid-action.");
         }
     }
 }
