@@ -5,10 +5,12 @@ import type { ScreenshotResult } from "../models/screenshot.models.js";
 
 /**
  * `screenshot` — capture a device's screen (primary display by default, a specific
- * display, the whole virtual desktop, or a window) and return the image inline plus
- * `coordinateSpace` metadata mapping image pixels to screen coordinates. The image is
- * uploaded to storage; the cloud server fetches it and inlines it so the model sees it
- * directly. Extends the HopToDesk MCP tool of the same name.
+ * display, the whole virtual desktop, or a window) and return the image as an inline
+ * MCP image content block plus a text block with `coordinateSpace` metadata mapping
+ * image pixels to screen coordinates. The image is uploaded to storage and the cloud
+ * server fetches it server-side so the agent sees it inline, not just a URL (the
+ * presigned `url` is still included in the text metadata as a download fallback).
+ * Extends the HopToDesk MCP tool of the same name.
  */
 export function registerScreenshotTool(
   server: McpServer,
@@ -18,7 +20,7 @@ export function registerScreenshotTool(
     "screenshot",
     {
       description:
-        "Capture a device's screen and return the image plus coordinate metadata. Defaults to the primary display (crisp, native 1:1). Use target=display with displayId, target=window with windowId (both from get_window_list/prior screenshot), or target=virtual for all monitors. Map an image pixel to a screen coordinate with coordinateSpace: screenX = coordinateSpace.screenX + imageX * scaleX (scaleX = 1 unless downscaled). Pass that screen coordinate to the mouse tool.",
+        "Capture a device's screen and return the image as an inline image content block plus coordinate metadata. Defaults to the primary display (crisp, native 1:1). Use target=display with displayId, target=window with windowId (both from get_window_list/prior screenshot), or target=virtual for all monitors. Map an image pixel to a screen coordinate with coordinateSpace: screenX = coordinateSpace.screenX + imageX * scaleX (scaleX = 1 unless downscaled). Pass that screen coordinate to the mouse tool.",
       inputSchema: z.object({
         deviceId: z.string().min(1).describe("Target deviceId from list_devices; not the readable deviceName"),
         target: z.enum(["primary", "virtual", "display", "window"]).default("primary").describe("primary display (default), all monitors (virtual), a specific display, or a window"),

@@ -59,8 +59,8 @@ namespace WindowsToolService
 
                 App.AppDataFolderPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) + "\\" + App.ProductName;
 
-                string MutexName = @"Local\" + ProductInfo.PrefixForGlobalEvents + "WindowsMcpToolService.Agent";
-                string ShowToolEvent = @"Local\" + ProductInfo.PrefixForGlobalEvents + "WindowsMcpToolService.Show";
+                string MutexName = @"Local\" + ProductInfo.PrefixForGlobalEvents + "McpToolService.Agent";
+                string ShowToolEvent = @"Local\" + ProductInfo.PrefixForGlobalEvents + "McpToolService.Show";
 
                 showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowToolEvent);
 

@@ -2,7 +2,7 @@ export interface ScreenshotResult {
     success: boolean;
     format: "png" | "jpeg";
     mimeType?: string;
-    /** Presigned download URL; the agent always uploads to storage instead of inlining bytes. */
+    /** Presigned download URL; kept as a download fallback since it can expire. */
     url?: string;
     uploaded?: boolean;
     size?: number;
