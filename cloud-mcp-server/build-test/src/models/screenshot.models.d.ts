@@ -1,8 +1,7 @@
 export interface ScreenshotResult {
     success: boolean;
-    format: "png" | "jpeg";
     mimeType?: string;
-    /** Presigned download URL; kept as a download fallback since it can expire. */
+    /** Presigned download URL; the cloud server fetches this server-side and inlines the bytes, then drops it from the final result. */
     url?: string;
     uploaded?: boolean;
     size?: number;
@@ -40,6 +39,4 @@ export interface ScreenshotResult {
         x: number;
         y: number;
     };
-    backend: string;
-    timestamp: string;
 }

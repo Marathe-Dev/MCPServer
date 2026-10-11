@@ -38,7 +38,6 @@ function fakeToolResult(message) {
             const jpeg = a.detail === "low";
             return ok({
                 success: true,
-                format: jpeg ? "jpeg" : "png",
                 mimeType: jpeg ? "image/jpeg" : "image/png",
                 uploaded: true,
                 url: "https://bucket.example/screenshots/x.png?X-Amz-Signature=demo",
@@ -49,8 +48,6 @@ function fakeToolResult(message) {
                 displays: [{ index: 0, displayId: "\\\\.\\DISPLAY1", name: "Generic Monitor", x: 0, y: 0, width: 1920, height: 1080, isPrimary: true, dpi: 96 }],
                 virtualBounds: { x: 0, y: 0, width: 1920, height: 1080 },
                 cursor: { x: 0, y: 0 },
-                backend: FAKE_BACKEND,
-                timestamp,
             });
         }
         case "RemoteWindowsList":
@@ -319,7 +316,7 @@ test("screenshot inlines the image and returns coordinateSpace mapping", async (
             assert.equal(parsed.coordinateSpace.scaleX, 1);
             assert.equal(parsed.coordinateSpace.screenX, 0);
             assert.ok(Array.isArray(parsed.displays) && typeof parsed.displays[0].displayId === "string");
-            assert.ok(typeof parsed.url === "string" && parsed.url.includes("X-Amz-Signature"));
+            assert.equal(parsed.url, undefined); // dropped from the final result; the image is already inlined
         });
     }
     finally {
