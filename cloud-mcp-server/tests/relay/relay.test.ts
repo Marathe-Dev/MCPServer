@@ -359,7 +359,11 @@ test("screenshot inlines the image and returns coordinateSpace mapping", async (
       assert.equal(parsed.coordinateSpace.scaleX, 1);
       assert.equal(parsed.coordinateSpace.screenX, 0);
       assert.ok(Array.isArray(parsed.displays) && typeof parsed.displays[0].displayId === "string");
-      assert.equal(parsed.url, undefined); // dropped from the final result; the image is already inlined
+      assert.equal(parsed.url, undefined); // dropped by default; the image is already inlined
+
+      const withUrl = await client.callTool({ name: "screenshot", arguments: { deviceId: DEVICE_ID, includeUrl: true } });
+      const urlText = (withUrl.content as Array<Record<string, unknown>>).find((c) => c.type === "text") as { text: string };
+      assert.ok(typeof JSON.parse(urlText.text).url === "string");
     });
   } finally {
     globalThis.fetch = originalFetch;
