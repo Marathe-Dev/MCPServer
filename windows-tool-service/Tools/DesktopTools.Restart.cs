@@ -29,7 +29,7 @@ namespace WindowsToolService
                         "). A restart may already be scheduled, or the action lacks permission.");
             }
 
-            var result = Result();
+            var result = new Dictionary<string, object> { { "success", true } };
             result["action"] = action;
             if (action == "restart")
             {

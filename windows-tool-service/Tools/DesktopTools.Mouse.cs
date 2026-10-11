@@ -25,7 +25,7 @@ namespace WindowsToolService
                     Send(new[] { MouseInput(down), MouseInput(down * 2) });
             }
 
-            var result = Result();
+            var result = new Dictionary<string, object> { { "success", true } };
             result["x"] = x;
             result["y"] = y;
             return result;
@@ -47,7 +47,7 @@ namespace WindowsToolService
             var flags = axis == "horizontal" ? 0x1000u : 0x0800u; // MOUSEEVENTF_HWHEEL : MOUSEEVENTF_WHEEL
             Send(new[] { MouseInput(flags, unchecked((uint)(amount * 120))) });
 
-            var result = Result();
+            var result = new Dictionary<string, object> { { "success", true } };
             result["amount"] = amount;
             result["axis"] = axis;
             return result;
@@ -70,7 +70,7 @@ namespace WindowsToolService
             Send(new[] { MouseInput(0x0001) }); // MOUSEEVENTF_MOVE so the target registers the drag
             Send(new[] { MouseInput(down * 2) });
 
-            var result = Result();
+            var result = new Dictionary<string, object> { { "success", true } };
             result["x"] = x;
             result["y"] = y;
             result["toX"] = toX;

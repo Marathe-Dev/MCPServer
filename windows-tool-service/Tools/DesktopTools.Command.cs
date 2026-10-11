@@ -81,8 +81,6 @@ namespace WindowsToolService
                 return new
                 {
                     success = !timedOut && exitCode == 0,
-                    backend = "winpty",
-                    timestamp = DateTime.UtcNow.ToString("o"),
                     exitCode = timedOut ? (long?)null : exitCode,
                     timedOut = timedOut,
                     output = capture.Text,

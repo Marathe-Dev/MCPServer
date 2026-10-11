@@ -13,7 +13,7 @@ namespace WindowsToolService
             var text = Arguments.Text(args, "text", 20000);
             foreach (var character in text)
                 Send(new[] { KeyInput(0, character, 4), KeyInput(0, character, 6) });
-            return Result();
+            return new Dictionary<string, object> { { "success", true } };
         }
 
         /// <summary>Presses the given keys together, then releases them in reverse order.</summary>
@@ -51,7 +51,7 @@ namespace WindowsToolService
                     releases.Add(KeyInput(pressed[i], 0, Extended(pressed[i]) | 2));
                 if (releases.Count > 0) Send(releases.ToArray());
             }
-            return Result();
+            return new Dictionary<string, object> { { "success", true } };
         }
 
         /// <summary>Maps a key name (letter, digit, F1–F24, or alias) to a virtual-key code.</summary>

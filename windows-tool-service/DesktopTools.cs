@@ -100,17 +100,6 @@ namespace WindowsToolService
             finally { CloseDesktop(desktop); }
         }
 
-        /// <summary>Common success envelope shared by every desktop result.</summary>
-        private Dictionary<string, object> Result()
-        {
-            return new Dictionary<string, object>
-            {
-                { "success", true },
-                { "backend", "win32" },
-                { "timestamp", DateTime.UtcNow.ToString("o") }
-            };
-        }
-
         // ── SendInput plumbing ───────────────────────────────────────────────────────
 
         private Input KeyInput(ushort key, ushort scan, uint flags)

@@ -65,7 +65,7 @@ namespace WindowsToolService
             var offset = Arguments.Integer(args, "offset", 0, int.MaxValue, 0);
             var page = windows.Skip(offset).Take(WindowListPageSize).ToList();
 
-            var result = Result();
+            var result = new Dictionary<string, object> { { "success", true } };
             result["windows"] = page;
             result["total"] = windows.Count;
             result["offset"] = offset;

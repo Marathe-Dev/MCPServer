@@ -32,8 +32,6 @@ namespace WindowsToolService
             return new Dictionary<string, object>
             {
                 { "success", true },
-                { "backend", "win32" },
-                { "timestamp", DateTime.UtcNow.ToString("o") },
                 { "path", full },
                 { "name", name },
                 { "size", size }

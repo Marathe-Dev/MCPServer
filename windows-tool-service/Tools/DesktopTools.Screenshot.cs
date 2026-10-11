@@ -81,8 +81,7 @@ namespace WindowsToolService
 
                     format = jpeg ? "jpeg" : "png";
                     mimeType = jpeg ? "image/jpeg" : "image/png";
-                    var result = Result();
-                    result["format"] = format;
+                    var result = new Dictionary<string, object> { { "success", true } };
                     result["mimeType"] = mimeType;
                     result["width"] = encoded.Width;
                     result["height"] = encoded.Height;

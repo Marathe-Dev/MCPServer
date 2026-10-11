@@ -51,7 +51,7 @@ namespace WindowsToolService
             else
                 LaunchChatWindow(message, agentName);
 
-            return Result();
+            return new Dictionary<string, object> { { "success", true } };
         }
 
         /// <summary>Returns the cached window's handle, or Zero if the chat window needs (re)launching.</summary>
