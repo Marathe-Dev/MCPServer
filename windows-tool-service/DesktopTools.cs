@@ -32,10 +32,8 @@ namespace WindowsToolService
         {
             switch (tool)
             {
-                // Remote command execution — opt-in; WinPTY runs its own desktop check.
+                // Remote command execution — WinPTY runs its own desktop check.
                 case "RemoteCMD":
-                    if (!_config.EnableCmd)
-                        throw new InvalidOperationException("CMD is disabled. Enable remote CMD in the agent window.");
                     return await _command.ExecuteAsync(args, token).ConfigureAwait(false);
 
                 // File read — no desktop required; always uploads to storage and returns a URL, never inline bytes.
@@ -75,10 +73,8 @@ namespace WindowsToolService
                 // Chat — view-only window for the host user; no desktop lock check (must still work on a locked screen).
                 case "RemoteChatMessage": return SendChatMessage(args);
 
-                // Restart — opt-in, separate from CMD; no desktop required (must work on a locked/logged-out machine).
+                // Restart — no desktop required (must work on a locked/logged-out machine).
                 case "RemoteRestart":
-                    if (!_config.EnableRestart)
-                        throw new InvalidOperationException("Restart is disabled. Enable remote restart in the agent window.");
                     return Restart(args);
 
                 default:

@@ -86,16 +86,14 @@ Distribute the whole `bin\Release` folder, not just the EXE — `winpty.dll` and
 
 1. Enter the cloud base URL, e.g. `ws://127.0.0.1:4000` locally or `wss://relay.example.com` remotely (no `/device-link` suffix).
 2. Pick a device name. A device ID is generated and saved on first connect.
-3. Enable **Allow remote CMD execution** only if you trust the relay — it's off by default.
-4. Optionally enable **Connect on startup** to connect whenever you launch the EXE.
-5. Click **Connect**. The device then shows up in the cloud server's `list_devices`.
+3. Click **Connect**. The device then shows up in the cloud server's `list_devices`.
 
 Settings live in `%LOCALAPPDATA%\WindowsMcpToolService\config.json` and can be overridden with `CLOUD_URL`, `DEVICE_ID`, `DEVICE_NAME` environment variables. Don't reuse the same device ID across machines or run two sessions for the same Windows user at once.
 
-Closing the window disconnects and exits; launching again in the same session brings
-the existing window forward. Click **Connect** to save settings. The old service-launch
-preference is ignored: **Connect on startup** defaults to off until selected explicitly.
-Existing device identity and CMD settings are retained.
+CMD and restart are always allowed — there's no opt-in flag or confirmation dialog. Closing the
+window disconnects and exits; launching again in the same session brings the existing window
+forward. Click **Connect** to save settings and connect — the window no longer auto-connects on
+launch. Existing device identity settings are retained.
 
 ## Existing Service Integration
 
@@ -110,13 +108,13 @@ owns launch/relaunch policy. Previously installed services are not automatically
 | --- | --- | --- |
 | `mouse` | `mouse` | `action` (`move`/`click`/`scroll`/`drag`); `x`, `y`; `button`, `clickType`; `toX`, `toY` (drag); `amount`, `axis` (scroll) |
 | `keyboard` | `keyboard` | `action` (`type`/`press`); `text` or `keys` (e.g. `["ctrl", "s"]`) |
-| `screenshot` | `RemoteScreenshot` | `target` (`primary` default/`virtual`/`display`/`window`), `displayId`, `windowId`, `detail` (`low`/`medium`/`high`) — requires storage configured (no inline base64 fallback) |
+| `screenshot` | `RemoteScreenshot` | `target` (`primary` default/`virtual`/`display`/`window`), `displayId`, `windowId`, `detail` (`low`/`medium`/`high`), optional `x`/`y`/`width`/`height` crop (all four together) — requires storage configured (no inline base64 fallback); `target=window` brings the window to the foreground before capturing |
 | `get_window_list` | `RemoteWindowsList` | `offset` (default 0), `includeMinimized` (default false); 15 windows per page — visible windows with `windowId`, geometry, focus, `processName`/`processId`, min/max state, `displayIndex`; tool/minimized/cloaked windows filtered; result carries `total`/`offset`/`count`/`hasMore` |
 | `cmd` | `RemoteCMD` | `command`, optional `workingDirectory`, `timeoutMs`, `maxOutputChars` |
 | `get_file` | `RemoteGetFile` | `path` (absolute); returns `url`, `name`, `size` — requires storage configured (no inline base64 fallback), files over 10 MB are rejected |
-| `restart` | `RemoteRestart` | `action` (`restart` default/`cancel`), `delaySeconds` (5–3600, default 30), `force`, `message` — requires local opt-in (`EnableRestart`); replies before the reboot happens, no interactive desktop required |
+| `restart` | `RemoteRestart` | `action` (`restart` default/`cancel`), `delaySeconds` (5–3600, default 30), `force`, `message` — always allowed; replies before the reboot happens, no interactive desktop required |
 
-Every relay action is dispatched by one `DesktopTools.CallAsync` switch. Results carry `success`, `backend` (`win32` or `winpty`), and an ISO `timestamp`. Key/mouse-button names match the existing TypeScript agent. The cloud server needs its own small rebuild to pick up the `cmd` and `get_file` tools:
+Every relay action is dispatched by one `DesktopTools.CallAsync` switch. Results always carry `success`; each tool adds whatever other fields it needs. Key/mouse-button names match the existing TypeScript agent. The cloud server needs its own small rebuild to pick up the `cmd` and `get_file` tools:
 
 ```powershell
 npm --prefix cloud-mcp-server run build

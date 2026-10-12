@@ -51,9 +51,6 @@ sequenceDiagram
         Win->>Cfg: AgentConfig.Load()
         Cfg-->>Win: settings (or defaults + new GUID DeviceId)
         Win->>Win: populate fields, ApplyModeEnablement
-        opt AutoConnectOnStartup
-            Win->>Win: ConnectAsync()
-        end
     end
 ```
 
@@ -65,13 +62,12 @@ sequenceDiagram
 Borderless, self-styled WPF window (`WindowStyle=None`, custom rounded-border template). Sections, top to bottom:
 
 1. **Connection** — a `modeCloud`/`modeRpc` radio row, then `Cloud URL`, `Pipe name`, `Device ID` (masked `PasswordBox`), `Device name`.
-2. **Options** — `Allow remote CMD execution` (guarded by a confirmation dialog before it can be turned on) and `Connect on startup`.
-3. **Activity** — a status line (`state`) plus a scrolling, size-capped (20,000→15,000 chars) log box (`activity`) fed by every `RelayClient` status callback.
-4. **Action bar** — `Connect` / `Disconnect` buttons.
+2. **Activity** — a status line (`state`) plus a scrolling, size-capped (20,000→15,000 chars) log box (`activity`) fed by every `RelayClient` status callback.
+3. **Action bar** — `Connect` / `Disconnect` buttons.
 
 `ApplyModeEnablement(enabled)` is the single place that decides which fields are usable: in **cloud** mode, `Cloud URL`/`Device ID`/`Device name` are enabled and `Pipe name` is disabled; in **rpc** mode it's the reverse. It's called from `Window_Loaded`, the mode radio buttons' `Checked` handler, and `SetControls` (which also disables everything while connected, per the "one connection at a time" model).
 
-`ConnectAsync()` (on Connect click or auto-connect): reads the UI into `_config`, calls `_config.Save()`, builds a fresh `DesktopTools` + `RelayClient`, and runs `relay.RunAsync()` on a background `Task`. `StopAsync()` cancels the token and awaits that task; it's idempotent (safe to call from both the Disconnect button and `Window_Closing`). Closing the window while connected first disconnects gracefully, then closes.
+`ConnectAsync()` (on Connect click): reads the UI into `_config`, calls `_config.Save()`, builds a fresh `DesktopTools` + `RelayClient`, and runs `relay.RunAsync()` on a background `Task`. `StopAsync()` cancels the token and awaits that task; it's idempotent (safe to call from both the Disconnect button and `Window_Closing`). Closing the window while connected first disconnects gracefully, then closes.
 
 ## 5. Connection modes — the core design
 
@@ -150,13 +146,13 @@ No `register` is sent in this path — RPCService and the broker already know wh
 
 ## 8. Tool dispatch — `DesktopTools.CallAsync`
 
-Single `switch` on the `tool` string; every branch returns a JSON-serializable object built on top of a common envelope (`success`, `backend`, `timestamp`):
+Single `switch` on the `tool` string; every branch returns a JSON-serializable object built on top of a common `{success: true}` envelope; each tool adds whatever other fields it needs:
 
 | Tool | Needs interactive desktop? | Notes |
 |---|---|---|
-| `RemoteCMD` | WinPTY checks it itself | Requires `EnableCmd`; delegates to `WinPtyCommand.ExecuteAsync`. |
+| `RemoteCMD` | WinPTY checks it itself | Always allowed; delegates to `WinPtyCommand.ExecuteAsync`. |
 | `RemoteGetFile` | No | Uploads via `S3Presigner`; storage must be configured — no inline base64 fallback. |
-| `RemoteRestart` | No | Schedules/cancels a restart via `shutdown.exe`; requires `EnableRestart`. Replies before the reboot — `delaySeconds` (min 5, default 30) is the grace period. |
+| `RemoteRestart` | No | Schedules/cancels a restart via `shutdown.exe`; always allowed. Replies before the reboot — `delaySeconds` (min 5, default 30) is the grace period. |
 | `mouse` | Yes | `action` (`move`/`click`/`scroll`/`drag`) selects the sub-behavior; `SetCursorPos` + `SendInput` (`mouse_event` flags), wheel notches, or down/move/up drag. |
 | `keyboard` | Yes | `action` (`type`/`press`) selects literal Unicode key-down/up pairs, or resolving key names (letters, digits, F1–F24, aliases) to virtual-key codes and pressing/releasing together (always releases, even on error). |
 | `RemoteScreenshot` | Yes | Captures primary (default)/virtual/display (by `displayId`)/window (by `windowId`) region via GDI+; `detail` preset picks PNG vs JPEG + downscale; returns `coordinateSpace` (1:1 at high detail); uploads to storage (no inline base64 fallback). |
@@ -171,7 +167,7 @@ Spawns `cmd.exe /d /s /c "<command>"` inside a real WinPTY console (not simple p
 Validates the path is absolute, exists, isn't a directory, and is ≤10 MB. Storage (`AgentConfig.StorageEnabled`, all five `E2Storage*` fields set) is **required** — the bytes are PUT to S3-compatible storage using a hand-rolled SigV4 presigner, and a presigned GET URL is returned; there is no inline-base64 fallback, so raw file/image bytes never pass through the relay or broker. Both `RemoteGetFile` and `RemoteScreenshot` fail with a clear error if storage isn't configured.
 
 ### Restart (`DesktopTools.Restart`)
-Schedules or cancels a restart via `shutdown.exe` (`/r /t {delaySeconds}` or `/a` to cancel), gated by its own `EnableRestart` opt-in (separate from `EnableCmd`) and, unlike every other tool, **not** gated by `RequireInteractiveDesktop()` — it must work on a locked/logged-out machine. `shutdown.exe` only *schedules* the reboot and exits almost instantly, so the handler returns (and the ack reaches the caller) well before Windows actually restarts — `delaySeconds` (floor 5, default 30) is the mandatory grace period that guarantees this. Argument construction is split into a pure `BuildArguments` method so it's unit-testable without ever spawning `shutdown.exe` in CI.
+Schedules or cancels a restart via `shutdown.exe` (`/r /t {delaySeconds}` or `/a` to cancel), always allowed (same as every other tool now) and, unlike every other tool, **not** gated by `RequireInteractiveDesktop()` — it must work on a locked/logged-out machine. `shutdown.exe` only *schedules* the reboot and exits almost instantly, so the handler returns (and the ack reaches the caller) well before Windows actually restarts — `delaySeconds` (floor 5, default 30) is the mandatory grace period that guarantees this. Argument construction is split into a pure `BuildArguments` method so it's unit-testable without ever spawning `shutdown.exe` in CI.
 
 ## 9. Configuration reference (`AgentConfig`)
 
@@ -181,15 +177,15 @@ Schedules or cancels a restart via `shutdown.exe` (`/r /t {delaySeconds}` or `/a
 | `CloudUrl` | `ws://`/`wss://` base URL for cloud mode (`/device-link` is appended automatically). |
 | `PipeName` | Named pipe name for rpc mode (default `RPCService.MCP.Relay`). |
 | `DeviceId` / `DeviceName` | Identity sent in `register` — required in cloud mode only. |
-| `EnableCmd` | Opt-in gate for `RemoteCMD`; toggling it on in the UI requires confirming a warning dialog. |
-| `AutoConnectOnStartup` | Connect automatically when the window loads. |
 | `E2Storage*` (Endpoint/Region/Bucket/AccessKey/SecretKey) + `StorageGetTtlSeconds` | S3-compatible storage — **required** for `RemoteScreenshot` and `RemoteGetFile` (no inline base64 fallback); all five must be set for `StorageEnabled` to be true. |
 
-Stored as JSON at `%LocalAppData%\WindowsMcpToolService\config.json`.
+Stored as JSON at `%LocalAppData%\WindowsMcpToolService\config.json`. Old keys `EnableCmd`, `EnableRestart`
+and `AutoConnectOnStartup` are ignored if present — every tool is always allowed now, and the
+window no longer auto-connects on load.
 
 ## 10. Logging
 
-`Log.Write` appends timestamped lines to `MCPToolService.Log` next to the EXE, trimming to the most recent 512 KB once the file passes 1 MB. It never throws, so a logging failure can never break the agent. Every relay status change, connect/disconnect action, CMD enable/decline, and raw sent/received JSON message is mirrored here — this is the file to check when diagnosing a deployed agent that isn't reachable interactively.
+`Log.Write` appends timestamped lines to `MCPToolService.Log` next to the EXE, trimming to the most recent 512 KB once the file passes 1 MB. It never throws, so a logging failure can never break the agent. Every relay status change, connect/disconnect action, and raw sent/received JSON message is mirrored here — this is the file to check when diagnosing a deployed agent that isn't reachable interactively.
 
 ## 11. Testing
 
@@ -203,6 +199,6 @@ Stored as JSON at `%LocalAppData%\WindowsMcpToolService\config.json`.
 ## 12. Security notes
 
 - The cloud relay has no authentication — only use `wss://` off-loopback, and put it behind a VPN/gateway.
-- `EnableCmd` and the desktop tools grant full control as the signed-in user; never run this elevated, and only point it at a trusted relay/RPCService.
+- CMD and the desktop tools grant full control as the signed-in user; never run this elevated, and only point it at a trusted relay/RPCService. Every tool is always available — there's no feature flag or confirmation dialog to get past.
 - One tool runs at a time per device — no queueing, just a busy error.
 - Tool arguments/output may be logged — don't pass secrets through them.

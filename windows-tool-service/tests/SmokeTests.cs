@@ -64,10 +64,8 @@ namespace WindowsToolService
                 Reject(() => Arguments.Integer(dictionary, "timeoutMs", 1, 10), "fractional integer rejection");
                 var serializer = new JavaScriptSerializer();
                 var legacy = serializer.Deserialize<AgentConfig>("{\"DeviceId\":\"saved-device\",\"DeviceName\":\"Saved name\",\"EnableCmd\":true,\"ConnectOnServiceLaunch\":true}");
-                Assert(!legacy.AutoConnectOnStartup && legacy.DeviceId == "saved-device" && legacy.DeviceName == "Saved name" && legacy.EnableCmd,
-                    "legacy settings preserved without enabling startup connections");
-                var startup = serializer.Deserialize<AgentConfig>(serializer.Serialize(new AgentConfig { AutoConnectOnStartup = true }));
-                Assert(startup.AutoConnectOnStartup, "startup preference round trip");
+                Assert(legacy.DeviceId == "saved-device" && legacy.DeviceName == "Saved name",
+                    "legacy settings tolerate unknown/removed JSON fields");
                 new RelayClient(config, (tool, arguments, token) => Task.FromResult<object>(null), Console.WriteLine);
                 Assert(System.Net.ServicePointManager.SecurityProtocol == System.Net.SecurityProtocolType.Tls12, "relay enables TLS 1.2");
                 var fileArgs = new Dictionary<string, object> { { "path", "relative\\path.txt" } };
@@ -93,14 +91,10 @@ namespace WindowsToolService
                 finally { try { File.Delete(oversized); } catch { } }
 
                 // DesktopTools is the single switch: it must route cmd + RemoteGetFile too.
-                var router = new DesktopTools(new AgentConfig { CloudUrl = "ws://127.0.0.1:4000", DeviceId = "router", DeviceName = "router", EnableCmd = false });
-                try { router.CallAsync("RemoteCMD", new Dictionary<string, object> { { "command", "echo hi" } }, CancellationToken.None).GetAwaiter().GetResult(); throw new Exception("Expected CMD rejection."); }
-                catch (InvalidOperationException) { Assert(true, "DesktopTools blocks CMD when disabled"); }
+                var router = new DesktopTools(new AgentConfig { CloudUrl = "ws://127.0.0.1:4000", DeviceId = "router", DeviceName = "router" });
                 // Storage gate is checked before the path even needs to exist.
                 try { router.CallAsync("RemoteGetFile", new Dictionary<string, object> { { "path", @"C:\any.bin" } }, CancellationToken.None).GetAwaiter().GetResult(); throw new Exception("Expected storage-required rejection."); }
                 catch (InvalidOperationException) { Assert(true, "DesktopTools requires storage for RemoteGetFile (no inline base64 backup)"); }
-                try { router.CallAsync("RemoteRestart", new Dictionary<string, object>(), CancellationToken.None).GetAwaiter().GetResult(); throw new Exception("Expected restart rejection."); }
-                catch (InvalidOperationException) { Assert(true, "DesktopTools blocks restart when disabled"); }
 
                 // Argument building is pure (no process spawn) so it's safe to test without ever rebooting the machine.
                 int delay;
@@ -189,7 +183,7 @@ namespace WindowsToolService
 
         private static async Task NativeAsync()
         {
-            var desktop = new DesktopTools(new AgentConfig { CloudUrl = "ws://127.0.0.1:4000", DeviceId = "native", DeviceName = "native", EnableCmd = true });
+            var desktop = new DesktopTools(new AgentConfig { CloudUrl = "ws://127.0.0.1:4000", DeviceId = "native", DeviceName = "native" });
             var windows = (Dictionary<string, object>)(await desktop.CallAsync("RemoteWindowsList", new Dictionary<string, object>(), CancellationToken.None));
             Assert((bool)windows["success"], "native window enumeration");
             var windowList = (System.Collections.IList)windows["windows"];
@@ -283,7 +277,7 @@ namespace WindowsToolService
             var application = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
             var window = new MainWindow(new AgentConfig
             {
-                CloudUrl = "ws://127.0.0.1:4000", DeviceId = "ui-test", DeviceName = "UI test", EnableCmd = true
+                CloudUrl = "ws://127.0.0.1:4000", DeviceId = "ui-test", DeviceName = "UI test"
             });
             window.Show();
             foreach (var width in new[] { 760, 520 })
@@ -299,9 +293,8 @@ namespace WindowsToolService
                 Assert(window.IsVisible && bitmap.PixelWidth == width, "WPF render width " + width);
             }
             Assert(((System.Windows.Controls.TextBox)window.FindName("cloud")).Text == "ws://127.0.0.1:4000" &&
-                ((System.Windows.Controls.TextBlock)window.FindName("state")).Text == "Stopped" &&
-                ((System.Windows.Controls.CheckBox)window.FindName("enableCmd")).IsChecked == true,
-                "XAML controls load settings without connecting or prompting for restored CMD permission");
+                ((System.Windows.Controls.TextBlock)window.FindName("state")).Text == "Stopped",
+                "XAML controls load settings without connecting");
             window.Close();
             Assert(!window.IsVisible, "window closes cleanly while disconnected");
             application.Shutdown();

@@ -48,8 +48,8 @@ namespace WindowsToolService
 
         // ── Startup ───────────────────────────────────────────────────────────
 
-        /// <summary>Loads saved settings into the fields, then auto-connects if enabled.</summary>
-        private async void Window_Loaded(object sender, RoutedEventArgs e)
+        /// <summary>Loads saved settings into the fields; the user connects manually.</summary>
+        private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             if (_initialized || DesignerProperties.GetIsInDesignMode(this)) return;
 
@@ -60,9 +60,6 @@ namespace WindowsToolService
                 deviceId.Password = _config.DeviceId;
                 name.Text = _config.DeviceName;
                 pipeName.Text = _config.PipeName;
-                enableCmd.IsChecked = _config.EnableCmd;
-                enableRestart.IsChecked = _config.EnableRestart;
-                autoConnect.IsChecked = _config.AutoConnectOnStartup;
 
                 if (_config.EffectiveConnectionMode == "rpc") 
                     modeRpc.IsChecked = true; 
@@ -74,9 +71,6 @@ namespace WindowsToolService
 
                 Log.Write("Settings loaded for device \"" + _config.DeviceName + "\".");
                 ShowForeground();
-
-                if (_config.AutoConnectOnStartup) 
-                    await ConnectAsync();
             }
             catch (Exception error)
             {
@@ -109,42 +103,6 @@ namespace WindowsToolService
             pipeName.IsEnabled = enabled && !cloudMode;
         }
 
-        /// <summary>Warns before enabling remote CMD; reverts the checkbox if declined.</summary>
-        private void EnableCmd_Checked(object sender, RoutedEventArgs e)
-        {
-            if (!_initialized) return;
-
-            const string message = "CMD lets the connected relay run arbitrary commands as your Windows user. " +
-                                   "Use only a trusted, access-controlled relay. Allow CMD?";
-            if (MessageBox.Show(this, message, "Remote command access", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
-            {
-                enableCmd.IsChecked = false;
-                Log.Write("Remote CMD access declined.");
-            }
-            else
-            {
-                Log.Write("Remote CMD access enabled.");
-            }
-        }
-
-        /// <summary>Warns before enabling remote restart; reverts the checkbox if declined.</summary>
-        private void EnableRestart_Checked(object sender, RoutedEventArgs e)
-        {
-            if (!_initialized) return;
-
-            const string message = "The connected relay will be able to reboot this machine, dropping the connection until it comes back " +
-                                   "up. Use only a trusted, access-controlled relay. Allow remote restart?";
-            if (MessageBox.Show(this, message, "Remote restart access", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
-            {
-                enableRestart.IsChecked = false;
-                Log.Write("Remote restart access declined.");
-            }
-            else
-            {
-                Log.Write("Remote restart access enabled.");
-            }
-        }
-
         // ── Connect / disconnect ──────────────────────────────────────────────
 
         /// <summary>Saves the settings and starts the relay loop on a background task.</summary>
@@ -160,9 +118,6 @@ namespace WindowsToolService
                 _config.DeviceName = name.Text.Trim();
                 _config.PipeName = pipeName.Text.Trim();
                 _config.ConnectionMode = modeRpc.IsChecked == true ? "rpc" : "cloud";
-                _config.EnableCmd = enableCmd.IsChecked == true;
-                _config.EnableRestart = enableRestart.IsChecked == true;
-                _config.AutoConnectOnStartup = autoConnect.IsChecked == true;
                 _config.Save();
 
                 _cancellation = new CancellationTokenSource();
@@ -226,8 +181,7 @@ namespace WindowsToolService
         private void SetControls(bool stopped)
         {
             var enabled = stopped && !_closing;
-            enableCmd.IsEnabled = enableRestart.IsEnabled = autoConnect.IsEnabled =
-                connect.IsEnabled = modeCloud.IsEnabled = modeRpc.IsEnabled = enabled;
+            connect.IsEnabled = modeCloud.IsEnabled = modeRpc.IsEnabled = enabled;
             disconnect.IsEnabled = !stopped && !_closing;
             ApplyModeEnablement(enabled); // owns cloud/deviceId/name/pipeName per mode
         }

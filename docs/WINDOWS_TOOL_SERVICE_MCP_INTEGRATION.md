@@ -190,7 +190,8 @@ Run one CMD command line through a real console (WinPTY) as the signed-in user.
   "durationMs": 0
 }
 ```
-> **Requires** the target machine's `windows-tool-service` to have "Allow remote CMD execution" enabled locally — this is a manual opt-in the signed-in user controls, it cannot be turned on remotely. If disabled, you'll get `ok:false, error:"CMD is disabled. Enable remote CMD in the agent window."`. Also requires an unlocked, interactive desktop (not locked/screen-saver/secure-desktop) — otherwise `ok:false, error:"Desktop unavailable or locked. Unlock the signed-in session first."`.
+> `RemoteCMD` is always allowed — there is no opt-in flag to enable on the device. It does **not**
+> require an unlocked, interactive desktop (WinPTY works even on a locked screen) — see §5.
 
 ### 4.6 `RemoteGetFile`
 Read a file from the device's local disk. **Requires storage to be configured on the device** (§4.7) — there is no inline-bytes fallback.
@@ -212,7 +213,7 @@ Read a file from the device's local disk. **Requires storage to be configured on
 Both tools always upload their bytes to S3-compatible storage on the device and return a presigned URL — **there is no inline-base64 mode at all**, by design, so file/image bytes never pass through the broker or MCP server. This means every machine that needs to serve these two tools must have storage configured locally in `windows-tool-service` (`E2StorageEndpoint`/`E2StorageRegion`/`E2StorageBucket`/`E2StorageAccessKey`/`E2StorageSecretKey`) — that's a local agent configuration concern, not something the MCP server sends per call. If it's missing, expect `ok:false` with the errors quoted above instead of a result.
 
 ### 4.8 `RemoteRestart`
-Schedules (or cancels) a restart of the device. **Requires local opt-in** (`EnableRestart`, separate from CMD) — no manifest/broker override. Does **not** require an interactive desktop; it must work on a locked or logged-out machine.
+Schedules (or cancels) a restart of the device. Always allowed — no opt-in flag, no manifest/broker override. Does **not** require an interactive desktop; it must work on a locked or logged-out machine.
 
 **The reply always arrives before the reboot.** The agent schedules the restart via `shutdown.exe` (which returns almost instantly after scheduling) and replies with the ack immediately — the actual reboot only happens `delaySeconds` later. Do not wait for a second message; there isn't one — the device simply goes offline once it reboots and reconnects on its own afterward.
 
