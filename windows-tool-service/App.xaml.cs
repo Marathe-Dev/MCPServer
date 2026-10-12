@@ -49,13 +49,10 @@ namespace WindowsToolService
 
                 SetDefaultDllDirectories(0x00000200 | 0x00000800);
 
-                if(!string.IsNullOrEmpty(LaunchArguments.Instance.EventPrefix))
-                    ProductInfo.PrefixForGlobalEvents = LaunchArguments.Instance.EventPrefix;
+                App.ProductName = LaunchArguments.Instance.ProductType;
+                ProductInfo.PrefixForGlobalEvents = (App.ProductName == $"{ProductInfo.Name} Host" ? "RPCH" : "RPC");
 
                 string exePath = Assembly.GetExecutingAssembly().Location;
-
-                App.ProductName = exePath.Contains($"{ProductInfo.Name} Host") ? $"{ProductInfo.Name} Host" :       // RemotePC Host 
-                                  ProductInfo.Name;                                                                 // RemotePC
 
                 App.AppDataFolderPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) + "\\" + App.ProductName;
 

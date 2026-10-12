@@ -162,6 +162,7 @@ namespace WindowsToolService
         private const int MONITOR_DEFAULTTONEAREST = 2;
         private const int MDT_EFFECTIVE_DPI = 0;
         private const int DWMWA_CLOAKED = 14;
+        private const int SW_RESTORE = 9;
 
         [DllImport("user32.dll", SetLastError = true)] private static extern bool SetCursorPos(int x, int y);
         [DllImport("user32.dll", SetLastError = true)] private static extern uint SendInput(uint count, Input[] inputs, int size);
@@ -183,6 +184,9 @@ namespace WindowsToolService
         [DllImport("user32.dll")] private static extern bool DrawIconEx(IntPtr hdc, int x, int y, IntPtr icon, int width, int height, int frame, IntPtr flickerFreeDraw, int flags);
         [DllImport("user32.dll")] private static extern IntPtr MonitorFromRect(ref Rect rect, int flags);
         [DllImport("user32.dll")] private static extern bool IsWindow(IntPtr handle);
+        [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr handle);
+        [DllImport("user32.dll")] private static extern bool BringWindowToTop(IntPtr handle);
+        [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr handle, int command);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern bool EnumDisplayDevices(string device, uint deviceNumber, ref DisplayDevice info, uint flags);
         [DllImport("dwmapi.dll")] private static extern int DwmGetWindowAttribute(IntPtr handle, int attribute, out int value, int size);
         [DllImport("shcore.dll")] private static extern int GetDpiForMonitor(IntPtr monitor, int dpiType, out uint dpiX, out uint dpiY);

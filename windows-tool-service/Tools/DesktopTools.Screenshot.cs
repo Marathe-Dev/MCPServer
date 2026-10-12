@@ -163,13 +163,14 @@ namespace WindowsToolService
             return screens[Arguments.Integer(args, "displayIndex", 0, screens.Length - 1, 0)].Bounds;
         }
 
-        /// <summary>Resolves a window capture rect from a stable windowId (HWND hex), falling back to a title substring.</summary>
+        /// <summary>Resolves a window capture rect from a stable windowId (HWND hex), falling back to a title substring; brings the window to the foreground first so the capture shows its own content, not whatever currently overlaps it.</summary>
         private Rectangle ResolveWindow(IDictionary<string, object> args)
         {
             if (args.ContainsKey("windowId"))
             {
                 var handle = ParseHandle(Arguments.Text(args, "windowId", 32));
                 if (!IsWindow(handle)) throw new ArgumentException("No window with that windowId (it may have closed).");
+                BringToForeground(handle);
                 Rect r;
                 if (!GetWindowRect(handle, out r)) throw new Win32Exception();
                 return Rectangle.FromLTRB(r.Left, r.Top, r.Right, r.Bottom);
@@ -214,7 +215,16 @@ namespace WindowsToolService
             }
         }
 
-        /// <summary>Finds the on-screen rectangle of the best-matching visible window by title (prefers focused).</summary>
+        /// <summary>Restores a minimized window and brings it to the foreground so the capture shows its own content; waits briefly for the compositor to redraw.</summary>
+        private void BringToForeground(IntPtr handle)
+        {
+            if (IsIconic(handle)) ShowWindow(handle, SW_RESTORE);
+            SetForegroundWindow(handle);
+            BringWindowToTop(handle);
+            Thread.Sleep(150);
+        }
+
+        /// <summary>Finds the on-screen rectangle of the best-matching visible window by title (prefers focused), bringing the match to the foreground first.</summary>
         private Rectangle WindowRect(string title)
         {
             var match = IntPtr.Zero;
@@ -236,6 +246,7 @@ namespace WindowsToolService
             EnumWindows(callback, IntPtr.Zero);
 
             if (match == IntPtr.Zero) throw new ArgumentException("No visible window title contains: " + title);
+            BringToForeground(match);
             Rect rect;
             if (!GetWindowRect(match, out rect)) throw new Win32Exception();
             return Rectangle.FromLTRB(rect.Left, rect.Top, rect.Right, rect.Bottom);

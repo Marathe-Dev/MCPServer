@@ -5,12 +5,15 @@ namespace WindowsToolService
 {
     /// <summary>
     /// Parses the single "key=value&amp;key=value" command-line blob RPCMainApp::LaunchWindowsToolService
-    /// passes (same convention as RPCChat.exe's command line) — e.g. "eventPrefix=RPC&amp;launchedFrom=RemotePCService".
+    /// passes (same convention as RPCChat.exe's command line) — e.g. "productType=RemotePC" or
+    /// "productType=RemotePC%20Host". Mirrors RemotePC-MCP-Host's host::launch_args.
     /// </summary>
     internal class LaunchArguments
     {
-        internal string EventPrefix { get; private set; } = string.Empty;
-        internal bool LaunchAsService { get; private set; }
+        private const string DefaultProduct = "RemotePC";
+        private const string HostProduct = "RemotePC Host";
+
+        internal string ProductType { get; private set; } = DefaultProduct;
 
         private static LaunchArguments _instance = new LaunchArguments();
         public static LaunchArguments Instance => _instance;
@@ -23,10 +26,17 @@ namespace WindowsToolService
             {
                 var kv = pair.Split(new[] { '=' }, 2);
                 if (kv.Length != 2) continue;
-
-                if (kv[0] == "eventPrefix") EventPrefix = kv[1];
-                else if (kv[0] == "LaunchAsService") LaunchAsService = string.Equals(kv[1], "Yes", StringComparison.OrdinalIgnoreCase);
+                
+                if (kv[0] == "productType") ProductType = ResolveProduct(Uri.UnescapeDataString(kv[1]));
             }
+        }
+
+        /// <summary>Matches a known product name case-insensitively, falling back to RemotePC for anything unrecognised.</summary>
+        private static string ResolveProduct(string name)
+        {
+            var trimmed = name.Trim();
+            if (string.Equals(trimmed, HostProduct, StringComparison.OrdinalIgnoreCase)) return HostProduct;
+            return DefaultProduct;
         }
     }
 }
