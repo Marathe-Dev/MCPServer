@@ -164,9 +164,8 @@ $env:E2_SECRET_ACCESS_KEY = "..."
 ```
 
 Because the key lives on the device, use a **scoped** key (only `PutObject`/`GetObject` on this
-bucket) and add a bucket lifecycle rule to expire old objects. `cmd` output is capped at 400,000
-characters so a single result fits the broker limit; any result that would still exceed ~500 KB
-is rejected with a clear error.
+bucket) and add a bucket lifecycle rule to expire old objects. `cmd` output is capped at 6,000
+characters by default (configurable via `maxOutputChars` between 1,024 and 6,000).
 
 ### Using `cmd`
 
@@ -176,11 +175,11 @@ is rejected with a clear error.
   "command": "ver & whoami & dir",
   "workingDirectory": "C:\\Users",
   "timeoutMs": 10000,
-  "maxOutputChars": 65536
+  "maxOutputChars": 6000
 }
 ```
 
-Each call spawns a fresh `cmd.exe /d /s /c` under WinPTY (defaults: 10s timeout, capped at 20s; 65,536 output characters, configurable up to 1,048,576). The result includes `output`, `exitCode`, `timedOut`, `truncated`, `durationMs`; a nonzero exit code or timeout is surfaced as an MCP error with the partial result still attached.
+Each call spawns a fresh `cmd.exe /d /s /c` under WinPTY (defaults: 10s timeout, capped at 20s; 6,000 output characters, configurable up to 6,000). The result includes `output`, `exitCode`, `timedOut`, `truncated`, `durationMs`; a nonzero exit code or timeout is surfaced as an MCP error with the partial result still attached.
 
 Only a single command line is accepted (use `&`/`&&` to chain); there's no interactive stdin, so don't use it for prompts, REPLs, or long-running servers. Output is raw terminal text and may contain ANSI escapes. On timeout or disconnect the WinPTY session is torn down, which kills console-attached children — but detached processes (e.g. from `start`) can outlive it.
 

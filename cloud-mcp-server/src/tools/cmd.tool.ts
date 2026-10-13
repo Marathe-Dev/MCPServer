@@ -7,7 +7,7 @@ export function registerCmdTool(server: McpServer, deviceRegistry: DeviceRegistr
     "cmd",
     {
       description:
-        "Run a CMD command through WinPTY on the Windows WPF tool service. Requires local CMD opt-in. Each call starts a fresh shell as the signed-in user. Output is terminal text, possibly including ANSI escapes. Do not use for interactive prompts or long-running servers.",
+        "Execute a single shell command on the device: cmd.exe /d /s /c on Windows, /bin/sh -c elsewhere. Runs in a real pseudoterminal as the signed-in user, even on a locked screen. Each call starts a fresh shell with no stdin, so it's one-shot only — not for interactive prompts, REPLs, or long-running servers. Output is raw terminal text and may include ANSI escapes, truncated to maxOutputChars.",
       inputSchema: z.object({
         deviceId: z.string().min(1).describe("Target deviceId from list_devices; not the readable deviceName"),
         command: z.string().min(1).max(8000).refine(
@@ -16,7 +16,7 @@ export function registerCmdTool(server: McpServer, deviceRegistry: DeviceRegistr
         ),
         workingDirectory: z.string().min(1).max(32767).optional(),
         timeoutMs: z.number().int().min(100).max(20000).default(10000),
-        maxOutputChars: z.number().int().min(1024).max(400000).default(65536),
+        maxOutputChars: z.number().int().min(1024).max(6000).default(6000).describe("Max characters of output to keep (1024 to 6000, default 6000)"),
       }),
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },

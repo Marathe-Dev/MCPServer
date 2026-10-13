@@ -146,11 +146,6 @@ namespace WindowsToolService
                     finally { try { File.Delete(uploadFile); } catch { } }
                 }
 
-                // Broker guard: any result over 500 KB is replaced with an error.
-                var capMethod = typeof(RelayClient).GetMethod("CapResult", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
-                var small = capMethod.Invoke(null, new object[] { new Dictionary<string, object> { { "ok", true } }, "r" });
-                var big = capMethod.Invoke(null, new object[] { new Dictionary<string, object> { { "blob", new string('x', 600 * 1024) } }, "r" });
-                Assert(small == null && big != null, "relay guards results over 500 KB");
                 if (args.Contains("--native"))
                 {
                     NativeAsync().GetAwaiter().GetResult();
@@ -244,8 +239,8 @@ namespace WindowsToolService
             var again = await Execute(command, "echo RECOVERED", 10000);
             Assert((bool)again["success"], "WinPTY recovery after cancellation");
 
-            try { await command.ExecuteAsync(new Dictionary<string, object> { { "command", "echo x" }, { "maxOutputChars", 500000 } }, CancellationToken.None); throw new Exception("Expected cap rejection."); }
-            catch (ArgumentException) { Assert(true, "WinPTY maxOutputChars capped at 400000"); }
+            try { await command.ExecuteAsync(new Dictionary<string, object> { { "command", "echo x" }, { "maxOutputChars", 7000 } }, CancellationToken.None); throw new Exception("Expected cap rejection."); }
+            catch (ArgumentException) { Assert(true, "WinPTY maxOutputChars capped at 6000"); }
         }
 
         private static async Task RelayAsync(AgentConfig config)
@@ -264,7 +259,7 @@ namespace WindowsToolService
             }
         }
 
-        private static async Task<Dictionary<string, object>> Execute(WinPtyCommand command, string text, int timeout, int maximum = 65536)
+        private static async Task<Dictionary<string, object>> Execute(WinPtyCommand command, string text, int timeout, int maximum = 8000)
         {
             var result = await command.ExecuteAsync(new Dictionary<string, object>
                 { { "command", text }, { "timeoutMs", timeout }, { "maxOutputChars", maximum } }, CancellationToken.None);

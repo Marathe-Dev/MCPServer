@@ -7,7 +7,7 @@ export function registerRestartTool(server: McpServer, deviceRegistry: DeviceReg
     "restart",
     {
       description:
-        "Schedule (or cancel) a restart of the device. Requires local restart opt-in. The reply arrives BEFORE the machine actually reboots — it only confirms the restart was scheduled; delaySeconds (minimum 5, default 30) is the grace period before the reboot happens, giving time for this reply to arrive and for anyone at the machine to save work. The device goes offline once it reboots and reconnects on its own afterward. Use action=cancel to abort a pending restart.",
+        "Schedule (or cancel) a restart of the device. The reply arrives BEFORE the machine actually reboots — it only confirms the restart was scheduled; delaySeconds (minimum 5, default 30) is the grace period before the reboot happens, giving time for this reply to arrive and for anyone at the machine to save work. The device goes offline once it reboots and reconnects on its own afterward. Use action=cancel to abort a pending restart.",
       inputSchema: z.object({
         deviceId: z.string().min(1).describe("Target deviceId from list_devices; not the readable deviceName"),
         action: z.enum(["restart", "cancel"]).default("restart").describe("restart = schedule a reboot; cancel = abort a pending one"),

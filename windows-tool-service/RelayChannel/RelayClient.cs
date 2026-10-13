@@ -108,9 +108,7 @@ namespace WindowsToolService
                     status("Running " + tool);
                     var result = await dispatch(tool, args, cancellation).ConfigureAwait(false); // dispatch = DesktopTools.CallAsync 
 
-                    // The 500 KB cap is the cloud broker's limit; the local pipe to RPCService has no such ceiling.
-                    var capped = config.EffectiveConnectionMode == "cloud" ? CapResult(result, requestId) : null;
-                    response = capped ?? new { type = "tool_result", requestId = requestId, ok = true, result = result };
+                    response = new { type = "tool_result", requestId = requestId, ok = true, result = result };
                 }
                 catch (Exception error)
                 {
@@ -122,22 +120,6 @@ namespace WindowsToolService
             }
             catch (Exception error) { Log.Write("Result delivery failed for tool \"" + tool + "\"", error); status("Result delivery failed: " + error.Message); }
             finally { actionGate.Release(); }
-        }
-
-        private const int MaxResultBytes = 500 * 1024;
-
-        /// <summary>Returns an error result when the payload would exceed the broker's 500 KB limit, else null.</summary>
-        private static object CapResult(object result, string requestId)
-        {
-            var json = new JavaScriptSerializer { MaxJsonLength = 64 * 1024 * 1024 }.Serialize(result);
-            if (Encoding.UTF8.GetByteCount(json) <= MaxResultBytes) return null;
-            return new
-            {
-                type = "tool_result",
-                requestId = requestId,
-                ok = false,
-                error = "Result exceeds the 500 KB relay limit. Configure storage so screenshots/files return a URL."
-            };
         }
 
         private async Task SendAsync(IRelayChannel channel, object message, CancellationToken cancellation)

@@ -210,7 +210,7 @@
       },
       {
         "name": "cmd",
-        "description": "Run a CMD command through WinPTY on the Windows WPF tool service. Requires local CMD opt-in. Each call starts a fresh shell as the signed-in user. Output is terminal text, possibly including ANSI escapes. Do not use for interactive prompts or long-running servers.",
+        "description": "Run a CMD command through WinPTY on this Windows device. Each call starts a fresh shell as the signed-in user. Output is terminal text, possibly including ANSI escapes, truncated to maxOutputChars. Do not use for interactive prompts or long-running servers.",
         "inputSchema": {
           "type": "object",
           "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -237,10 +237,10 @@
               "maximum": 20000
             },
             "maxOutputChars": {
-              "default": 65536,
+              "default": 6000,
               "type": "integer",
               "minimum": 1024,
-              "maximum": 400000
+              "maximum": 6000
             }
           },
           "required": [
@@ -257,7 +257,7 @@
       },
       {
         "name": "get_file",
-        "description": "Read a file from the Windows tool service device and return it as base64. Absolute Windows path required. Files larger than 10 MB are rejected.",
+        "description": "Read a file from the device. Uploads it to storage and returns a presigned download URL (no base64). Absolute path required (any OS). Files larger than 10 MB are rejected.",
         "inputSchema": {
           "type": "object",
           "$schema": "https://json-schema.org/draft/2020-12/schema",

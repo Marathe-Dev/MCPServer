@@ -19,7 +19,7 @@ function fakeToolResult(message) {
         case "RemoteCMD": {
             const args = message.args;
             assert.equal(args.timeoutMs, 10000);
-            assert.equal(args.maxOutputChars, 65536);
+            assert.equal(args.maxOutputChars, 6000);
             return ok({ success: args.command !== "exit /b 7", exitCode: args.command === "exit /b 7" ? 7 : 0,
                 output: "hello\r\n", timedOut: false, truncated: false, backend: FAKE_BACKEND, timestamp });
         }
@@ -148,9 +148,10 @@ test("discovers all MCP tools through the relay", async () => {
             "mouse",
             "restart",
             "screenshot",
+            "send_chat_message",
             "update",
         ]);
-        const targeted = new Set(["cmd", "get_file", "get_window_list", "keyboard", "mouse", "restart", "screenshot", "update"]);
+        const targeted = new Set(["cmd", "get_file", "get_window_list", "keyboard", "mouse", "restart", "screenshot", "send_chat_message", "update"]);
         for (const tool of tools.filter((tool) => targeted.has(tool.name))) {
             assert.ok(tool.inputSchema.required?.includes("deviceId"), tool.name);
             assert.ok(!Object.hasOwn(tool.inputSchema.properties ?? {}, "deviceName"), tool.name);
